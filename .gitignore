@@ -1,0 +1,27 @@
+# Executables and large binaries (This is fixing your 25MB issue!)
+cloudflared.exe
+*.exe
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.venv/
+
+# Database files (You generally don't want to upload your live database of users to GitHub)
+*.db
+*.sqlite3
+
+# Log files
+*.log
+
+# Environment variables (Keep secrets out of GitHub)
+.env
+
+# IDE / Editor folders
+.vscode/
+.idea/

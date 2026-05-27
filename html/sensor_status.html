@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Sensor Status{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    
+    <!-- Sensor Hardware -->
+    <div class="glass-card p-6">
+        <h3 class="font-bold text-lg mb-6 border-b border-white/10 pb-4"><i class="fa-solid fa-microchip text-blue-400 mr-2"></i> Edge Nodes</h3>
+        
+        <div class="space-y-6">
+            <!-- Node 1 -->
+            <div class="bg-black/30 p-4 rounded-xl border border-[#00d27f]/30">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded bg-[#00d27f]/20 flex items-center justify-center text-[#00d27f]">
+                            <i class="fa-brands fa-usb"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold">ESP32 Main Node</p>
+                            <p class="text-xs text-gray-400">ID: AGR-Node-001</p>
+                        </div>
+                    </div>
+                    <span id="node-status" class="bg-[#00d27f]/20 text-[#00d27f] text-xs px-2 py-1 rounded border border-[#00d27f]/30">Online</span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 text-sm border-t border-white/5 pt-4">
+                    <div>
+                        <p class="text-gray-500">Last Seen</p>
+                        <p class="font-medium">Just now</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Battery</p>
+                        <p class="font-medium text-green-400">85%</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Moisture Sensor</p>
+                        <p class="font-medium">Active</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Temp Sensor</p>
+                        <p class="font-medium">Active</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Diagnostics -->
+    <div class="glass-card p-6">
+        <h3 class="font-bold text-lg mb-6 border-b border-white/10 pb-4"><i class="fa-solid fa-brain text-purple-400 mr-2"></i> AI Diagnostics</h3>
+        
+        <div class="space-y-4">
+            <div class="flex justify-between items-center py-2 border-b border-white/5">
+                <span class="text-gray-400">Model Name</span>
+                <span class="font-medium">RandomForestClassifier</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-white/5">
+                <span class="text-gray-400">Training Status</span>
+                <span class="text-[#00d27f] font-medium"><i class="fa-solid fa-check-circle mr-1"></i> Trained</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-white/5">
+                <span class="text-gray-400">Fallback Mechanism</span>
+                <span class="text-yellow-400 font-medium">Ready</span>
+            </div>
+            <div class="flex justify-between items-center py-2 border-b border-white/5">
+                <span class="text-gray-400">Auto-Retraining</span>
+                <span class="text-[#00d27f] font-medium">Enabled (Every 100 recs)</span>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-purple-900/20 border border-purple-500/30 p-4 rounded-xl text-center">
+            <h4 class="text-purple-300 font-bold mb-2">Self-Learning Active</h4>
+            <p class="text-sm text-purple-200/70">The AI model continuously ingests new sensor readings to improve its environmental predictions.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

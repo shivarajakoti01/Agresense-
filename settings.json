@@ -1,0 +1,12 @@
+{
+    "weather_prediction_enabled": true,
+    "fallback_mode_enabled": true,
+    "retraining_frequency": 100,
+    "dry_threshold": 20,
+    "high_temp_threshold": 23,
+    "latitude": 12.9110899,
+    "longitude": 74.8492686,
+    "auto_location_enabled": false,
+    "location_name": "[Manual] Derebail, Mangaluru, Karnataka",
+    "pump_flow_rate": 9.0
+}

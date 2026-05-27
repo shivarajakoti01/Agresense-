@@ -1,0 +1,340 @@
+{% extends 'base.html' %}
+
+{% block page_title %}AgriSense Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Custom Notification/Alert Banners (Rendered as beautiful glassmorphic overlays) -->
+<!-- ESP32 Offline Alarm Banner -->
+<div id="esp32-offline-banner" class="hidden mb-6 bg-red-950/40 border border-red-500/50 text-red-200 px-6 py-4 rounded-2xl flex items-center justify-between gap-4 shadow-[0_0_20px_rgba(255,77,77,0.15)] animate-pulse z-20">
+    <div class="flex items-center gap-4">
+        <div class="bg-red-500/20 w-12 h-12 rounded-full flex items-center justify-center text-red-400 text-xl animate-bounce">
+            <i class="fa-solid fa-power-off"></i>
+        </div>
+        <div>
+            <h3 class="font-extrabold text-white text-base tracking-wide" style="font-family: 'Outfit', sans-serif;">ESP32 DEVICE DETECTED OFFLINE</h3>
+            <p class="text-xs text-red-300 mt-0.5">The hardware transmitter is not sending data. Please check device power and switch on immediately!</p>
+        </div>
+    </div>
+    <span class="text-[10px] bg-red-500 text-white font-extrabold px-3 py-1.5 rounded-full uppercase tracking-widest">Device Alert</span>
+</div>
+
+<!-- Fallback Banner -->
+<div id="fallback-banner" class="hidden mb-6 bg-yellow-950/40 border border-yellow-500/50 text-yellow-200 px-6 py-4 rounded-2xl flex items-center gap-4 shadow-[0_0_15px_rgba(255,159,67,0.15)]">
+    <div class="bg-yellow-500/20 w-10 h-10 rounded-full flex items-center justify-center text-yellow-500 text-lg">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+    </div>
+    <div>
+        <h3 class="font-bold text-white text-sm" style="font-family: 'Outfit', sans-serif;">AI Fallback Mode Active</h3>
+        <p class="text-xs text-yellow-300/80">Moisture sensor failure detected. Estimated telemetry is active using crop science models.</p>
+    </div>
+</div>
+
+<!-- Top Row: System Status & Weather Summary -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    
+    <!-- System Status Widget -->
+    <div class="glass-card p-6 flex items-center justify-between">
+        <div>
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">System Status</span>
+            <div class="flex items-center gap-2">
+                <span class="text-xl font-extrabold text-white" style="font-family: 'Outfit';">Active & Auto</span>
+                <span class="w-2.5 h-2.5 rounded-full bg-[#00ff9d] heart-pulse ml-1"></span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Autonomous ML core active & listening</p>
+        </div>
+        <div class="bg-[#00ff9d]/5 border border-[#00ff9d]/20 px-3 py-1.5 rounded-xl">
+            <span id="system-healthy-text" class="text-xs font-bold text-[#00ff9d] uppercase tracking-wider">● Healthy</span>
+        </div>
+    </div>
+
+    <!-- Sleek Weather Widget -->
+    <div class="glass-card p-6 flex items-center justify-between">
+        <div class="space-y-1">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Weather Forecast</span>
+            <div class="flex items-center gap-2">
+                <i id="weather-icon" class="fa-solid fa-cloud-sun text-lg text-[#00d2ff]"></i>
+                <span id="weather-location-name" class="text-sm font-extrabold text-white">Station</span>
+                <span class="text-gray-600">|</span>
+                <span id="weather-temp" class="text-sm font-bold text-[#00d2ff]">24°C</span>
+                <span id="weather-summary" class="text-xs text-gray-400">Cloudy</span>
+            </div>
+            <div class="flex items-center gap-4 text-[11px] text-gray-500 mt-1">
+                <span>Rain Prob: <strong id="weather-rain-prob" class="text-white">15%</strong></span>
+                <span>Weather AI: <span id="weather-status-label" class="text-[#00ff9d] font-bold">Enabled</span></span>
+            </div>
+        </div>
+        
+        <!-- Toggle Button for Weather Override -->
+        <div class="flex flex-col items-end gap-1.5">
+            <span id="weather-override-badge" class="hidden text-[8px] font-extrabold uppercase tracking-wider bg-red-950/80 text-red-400 border border-red-500/20 px-2 py-0.5 rounded animate-pulse">Override</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="dashboard-weather-toggle" class="sr-only peer" onchange="toggleDashboardWeather(this)">
+                <div class="w-9 h-5 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00ff9d]"></div>
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Core Gauges Row: 3-Zone Soil Moisture Progress -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    
+    <!-- Crops 1 Moisture Gauge (Live Hardware) -->
+    <div id="soil-card-1" class="glass-card p-6 flex flex-col justify-between relative overflow-hidden h-[280px] group">
+        <!-- Offline Card Overlay -->
+        <div class="card-state-overlay offline-overlay">
+            <div class="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400 text-lg mb-2">
+                <i class="fa-solid fa-power-off animate-pulse"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-1">Transmitter Offline</h4>
+            <p class="text-[10px] text-gray-400 max-w-[180px]">Check hardware power supply and ESP32 status immediately.</p>
+        </div>
+
+        <div class="flex justify-between items-start z-10">
+            <div>
+                <h3 class="text-base font-bold text-white" style="font-family: 'Outfit';">Soil Moisture (%)</h3>
+                <span class="text-xs text-gray-500">Crops 1 (Live Transmit)</span>
+            </div>
+            <button class="text-gray-600 hover:text-white p-1 transition"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+        </div>
+        
+        <!-- Custom Gradient Circular Arc Gauge -->
+        <div class="gauge-container z-10 -mt-2">
+            <svg class="gauge-svg" width="140" height="140">
+                <circle class="gauge-track" cx="70" cy="70" r="50"></circle>
+                <!-- Arc length calculation (2 * PI * r) = 314.15. dasharray="314.15" stroke-dashoffset controls the fill -->
+                <circle id="moisture-gauge-1" class="gauge-fill text-[#00d2ff]" cx="70" cy="70" r="50" stroke="currentColor" stroke-dasharray="314.15" stroke-dashoffset="100"></circle>
+            </svg>
+            <div class="gauge-center-text">
+                <span id="live-moisture" class="text-3xl font-extrabold text-white" style="font-family: 'Outfit';">68%</span>
+                <span id="moisture-status-1" class="text-[10px] uppercase font-bold text-[#00d2ff] tracking-wider mt-0.5">Optimized</span>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center z-10 pb-4">
+            <span class="text-xs text-gray-500 font-medium">soil level</span>
+            <span id="moisture-change-1" class="text-xs font-bold text-[#00ff9d] bg-[#00ff9d]/8 border border-[#00ff9d]/20 px-2 py-0.5 rounded-full">+2%</span>
+        </div>
+
+        <!-- Animated Wave Layer -->
+        <div class="soil-wave-wrapper">
+            <svg class="soil-wave-svg soil-wave-1" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                <path d="M0,60 C150,90 350,30 500,60 C650,90 850,30 1000,60 C1150,90 1350,30 1500,60 L1500,120 L0,120 Z"/>
+            </svg>
+            <svg class="soil-wave-svg soil-wave-2" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                <path d="M0,50 C180,80 300,20 480,50 C660,80 780,20 960,50 C1140,80 1260,20 1440,50 L1440,120 L0,120 Z"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Orchard 2 Moisture Gauge (Simulated Agriculture Zone) -->
+    <div id="soil-card-2" class="glass-card p-6 flex flex-col justify-between relative overflow-hidden h-[280px] group">
+        <!-- Offline Card Overlay -->
+        <div class="card-state-overlay offline-overlay">
+            <div class="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400 text-lg mb-2">
+                <i class="fa-solid fa-power-off"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-1">System Offline</h4>
+            <p class="text-[10px] text-gray-400 max-w-[180px]">No sensor data stream is available when main ESP32 is offline.</p>
+        </div>
+
+        <!-- Unconfigured Card Overlay -->
+        <div class="card-state-overlay unconfigured-overlay">
+            <div class="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 text-lg mb-3">
+                <i class="fa-solid fa-circle-nodes animate-pulse"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-1">Zone Inactive</h4>
+            <p class="text-[10px] text-gray-400 max-w-[180px] mb-4">Orchard 2 currently has no connected telemetry hardware.</p>
+            <button onclick="alert('Searching for active ESP32 edge nodes in orchard zone 2... Ensure transmitter is powered.')" class="bind-btn"><i class="fa-solid fa-plus text-[9px]"></i> Bind Sensor</button>
+        </div>
+
+        <div class="flex justify-between items-start z-10">
+            <div>
+                <h3 class="text-base font-bold text-white" style="font-family: 'Outfit';">Soil Moisture (%)</h3>
+                <span class="text-xs text-gray-500">Orchard 2 (Auto Sector)</span>
+            </div>
+            <button class="text-gray-600 hover:text-white p-1 transition"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+        </div>
+        
+        <div class="gauge-container z-10 -mt-2">
+            <svg class="gauge-svg" width="140" height="140">
+                <circle class="gauge-track" cx="70" cy="70" r="50"></circle>
+                <circle id="moisture-gauge-2" class="gauge-fill text-[#ff9f43]" cx="70" cy="70" r="50" stroke="currentColor" stroke-dasharray="314.15" stroke-dashoffset="172"></circle>
+            </svg>
+            <div class="gauge-center-text">
+                <span id="moisture-value-2" class="text-3xl font-extrabold text-white" style="font-family: 'Outfit';">45%</span>
+                <span id="moisture-status-2" class="text-[10px] uppercase font-bold text-[#ff9f43] tracking-wider mt-0.5">Needs Attention</span>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center z-10 pb-4">
+            <span class="text-xs text-gray-500 font-medium">soil level</span>
+            <span id="moisture-change-2" class="text-xs font-bold text-red-400 bg-red-950/20 border border-red-500/20 px-2 py-0.5 rounded-full">-4%</span>
+        </div>
+
+        <!-- Animated Wave Layer -->
+        <div class="soil-wave-wrapper">
+            <svg class="soil-wave-svg soil-wave-1" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                <path d="M0,60 C150,90 350,30 500,60 C650,90 850,30 1000,60 C1150,90 1350,30 1500,60 L1500,120 L0,120 Z"/>
+            </svg>
+            <svg class="soil-wave-svg soil-wave-2" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                <path d="M0,50 C180,80 300,20 480,50 C660,80 780,20 960,50 C1140,80 1260,20 1440,50 L1440,120 L0,120 Z"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Garden 3 Moisture Gauge (Simulated Agriculture Zone) -->
+    <div id="soil-card-3" class="glass-card p-6 flex flex-col justify-between relative overflow-hidden h-[280px] group">
+        <!-- Offline Card Overlay -->
+        <div class="card-state-overlay offline-overlay">
+            <div class="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400 text-lg mb-2">
+                <i class="fa-solid fa-power-off"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-1">System Offline</h4>
+            <p class="text-[10px] text-gray-400 max-w-[180px]">No sensor data stream is available when main ESP32 is offline.</p>
+        </div>
+
+        <!-- Unconfigured Card Overlay -->
+        <div class="card-state-overlay unconfigured-overlay">
+            <div class="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 text-lg mb-3">
+                <i class="fa-solid fa-seedling animate-pulse"></i>
+            </div>
+            <h4 class="text-sm font-bold text-white mb-1">Zone Inactive</h4>
+            <p class="text-[10px] text-gray-400 max-w-[180px] mb-4">Garden 3 currently has no connected telemetry hardware.</p>
+            <button onclick="alert('Searching for active ESP32 edge nodes in garden zone 3... Ensure transmitter is powered.')" class="bind-btn"><i class="fa-solid fa-plus text-[9px]"></i> Bind Sensor</button>
+        </div>
+
+        <div class="flex justify-between items-start z-10">
+            <div>
+                <h3 class="text-base font-bold text-white" style="font-family: 'Outfit';">Soil Moisture (%)</h3>
+                <span class="text-xs text-gray-500">Garden 3 (Auto Sector)</span>
+            </div>
+            <button class="text-gray-600 hover:text-white p-1 transition"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+        </div>
+        
+        <div class="gauge-container z-10 -mt-2">
+            <svg class="gauge-svg" width="140" height="140">
+                <circle class="gauge-track" cx="70" cy="70" r="50"></circle>
+                <circle id="moisture-gauge-3" class="gauge-fill text-[#00ff9d]" cx="70" cy="70" r="50" stroke="currentColor" stroke-dasharray="314.15" stroke-dashoffset="87"></circle>
+            </svg>
+            <div class="gauge-center-text">
+                <span id="moisture-value-3" class="text-3xl font-extrabold text-white" style="font-family: 'Outfit';">72%</span>
+                <span id="moisture-status-3" class="text-[10px] uppercase font-bold text-[#00ff9d] tracking-wider mt-0.5">Optimal</span>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center z-10 pb-4">
+            <span class="text-xs text-gray-500 font-medium">soil level</span>
+            <span id="moisture-change-3" class="text-xs font-bold text-[#00ff9d] bg-[#00ff9d]/8 border border-[#00ff9d]/20 px-2 py-0.5 rounded-full">+1%</span>
+        </div>
+
+        <!-- Animated Wave Layer -->
+        <div class="soil-wave-wrapper">
+            <svg class="soil-wave-svg soil-wave-1" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                <path d="M0,60 C150,90 350,30 500,60 C650,90 850,30 1000,60 C1150,90 1350,30 1500,60 L1500,120 L0,120 Z"/>
+            </svg>
+            <svg class="soil-wave-svg soil-wave-2" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                <path d="M0,50 C180,80 300,20 480,50 C660,80 780,20 960,50 C1140,80 1260,20 1440,50 L1440,120 L0,120 Z"/>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Section: Ambient Temperature Timeline & AI Status Log -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Ambient Temperature Timeline Chart Panel -->
+    <div class="glass-card p-6 lg:col-span-2">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h3 class="text-lg font-bold text-white" style="font-family: 'Outfit';">Ambient Temperature Timeline</h3>
+                <p class="text-xs text-gray-500" id="timeline-location">Station</p>
+            </div>
+            
+            <!-- Timeline Selector Dropdown (Styled exactly like Reference Image) -->
+            <div class="relative">
+                <select id="time-filter" class="appearance-none bg-white/5 border border-white/5 text-xs text-gray-300 py-1.5 pl-3 pr-8 rounded-lg focus:outline-none focus:border-[#00ff9d] transition cursor-pointer">
+                    <option value="7d">Past 7 Days</option>
+                    <option value="24h">Past 24 Hours</option>
+                    <option value="30d">Past 30 Days</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                    <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Live Timeline Charts -->
+        <div class="relative h-64 w-full">
+            <canvas id="tempChart" class="w-full h-full"></canvas>
+            <div class="hidden">
+                <canvas id="moistureChart"></canvas> <!-- Kept invisible for background main.js data compatibility -->
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Prediction & Pump History Status Log Panel -->
+    <div class="glass-card p-6 flex flex-col justify-between">
+        <div>
+            <!-- Tabs Header -->
+            <div class="flex justify-between items-center mb-4 border-b border-white/5 pb-2">
+                <div class="flex gap-4">
+                    <button id="tab-ai-logs" onclick="switchTab('ai')" class="text-sm font-extrabold pb-2 border-b-2 border-[#00ff9d] text-white transition-all duration-300 focus:outline-none" style="font-family: 'Outfit';">
+                        AI Predictions
+                    </button>
+                    <button id="tab-pump-history" onclick="switchTab('pump')" class="text-sm font-extrabold pb-2 border-b-2 border-transparent text-gray-500 hover:text-gray-300 transition-all duration-300 focus:outline-none" style="font-family: 'Outfit';">
+                        Pump History
+                    </button>
+                </div>
+                <span class="text-[9px] font-extrabold uppercase bg-[#00ff9d]/10 text-[#00ff9d] border border-[#00ff9d]/20 px-2 py-0.5 rounded">Live</span>
+            </div>
+            
+            <div class="mb-3" id="next-schedule-container">
+                <p class="text-xs text-gray-500" id="next-schedule-label">Next Scheduled: 6:00 AM, May 27th</p>
+            </div>
+
+            <!-- List of AI Logs with elegant indicator markers -->
+            <div id="ai-logs-list" class="space-y-4 pt-2">
+                <!-- Loaded dynamically by main.js -->
+            </div>
+
+            <!-- List of Pump Logs with elegant indicator markers -->
+            <div id="pump-logs-list" class="space-y-4 pt-2 hidden">
+                <!-- Loaded dynamically by main.js -->
+                <p class="text-xs text-gray-500 text-center py-4">No pump history records yet.</p>
+            </div>
+        </div>
+
+        <!-- Sleek Quick Action Trigger -->
+        <div class="mt-6 pt-4 border-t border-white/5 flex gap-2">
+            <!-- Hidden elements for dynamic main.js controller compatibility -->
+            <div class="hidden">
+                <span id="live-temp">--.-°C</span>
+                <span id="ai-water-needed">Awaiting...</span>
+                <span id="ai-recommendation">Awaiting...</span>
+                <span id="water-time-day">--</span>
+                <span id="water-day">--</span>
+                <span id="water-week">--</span>
+                <span id="water-month">--</span>
+                <div id="alerts-container"></div>
+            </div>
+            
+            <button onclick="triggerManualPump()" class="w-full bg-[#00ff9d] hover:bg-[#00d27f] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] hover:shadow-[0_0_30px_rgba(0,255,157,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play text-[10px]"></i> Trigger Pump
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Inline quick click handler delegated to main.js controller
+async function triggerManualPump() {
+    if (typeof window.triggerManualPumpController === 'function') {
+        await window.triggerManualPumpController();
+    } else {
+        alert("Dashboard controller not loaded yet. Please wait.");
+    }
+}
+</script>
+
+{% endblock %}

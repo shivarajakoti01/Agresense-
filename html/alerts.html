@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block page_title %}System Alerts{% endblock %}
+
+{% block content %}
+<div class="glass-card p-6 min-h-[500px]">
+    <div class="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+        <h3 class="font-bold text-lg"><i class="fa-solid fa-bell text-yellow-500 mr-2"></i> All Alerts</h3>
+        <button onclick="resolveAllAlerts()" class="text-sm bg-white/10 hover:bg-white/20 px-3 py-1 rounded transition">Mark all resolved</button>
+    </div>
+
+    <div id="alerts-container" class="space-y-4">
+        <!-- Will be populated by JS -->
+        <p class="text-center text-gray-500 py-8">Loading alerts...</p>
+    </div>
+</div>
+{% endblock %}

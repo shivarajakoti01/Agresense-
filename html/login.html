@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AgriSense AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body class="flex items-center justify-center h-screen bg-cover bg-center overflow-hidden"
+    style="background-image: linear-gradient(135deg, rgba(8, 13, 22, 0.82), rgba(8, 13, 22, 0.72)), url('{{ url_for('static', filename='images/grass_bg.png') }}'); font-family: 'Plus Jakarta Sans', sans-serif;">
+
+    <div class="glass-card w-full max-w-md p-10 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden backdrop-blur-2xl bg-black/40 group">
+        <!-- Decoration -->
+        <div class="absolute top-0 right-0 w-48 h-48 bg-[#00ff9d]/5 rounded-full blur-[60px] transition duration-700 group-hover:scale-150 -mr-10 -mt-10"></div>
+        <div class="absolute bottom-0 left-0 w-48 h-48 bg-[#00d2ff]/5 rounded-full blur-[60px] transition duration-700 group-hover:scale-150 -ml-10 -mb-10"></div>
+
+        <div class="text-center mb-10 relative z-10">
+            <div
+                class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00ff9d] to-[#00d2ff] mb-6 shadow-[0_0_30px_rgba(0,255,157,0.25)] border border-[#00ff9d]/30">
+                <i class="fa-solid fa-leaf text-2xl text-[#080d16]"></i>
+            </div>
+            <h1 class="text-3xl font-extrabold text-white mb-1 tracking-tight" style="font-family: 'Outfit', sans-serif;">
+                AgriSense <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#00ff9d] to-[#00d2ff]">AI</span>
+            </h1>
+            <p class="text-[#00ff9d] text-[10px] font-bold uppercase tracking-widest mt-1">Smart Irrigation Platform</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div
+            class="mb-4 p-3 rounded-lg text-sm {% if category == 'error' %}bg-red-900/50 text-red-200 border border-red-500/50{% else %}bg-green-900/50 text-green-200 border border-green-500/50{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('login') }}" method="POST" class="space-y-6 relative z-10">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-[#00ff9d]">
+                        <i class="fa-solid fa-envelope text-gray-500 group-focus-within:text-[#00ff9d] transition-colors"></i>
+                    </div>
+                    <input type="email" name="email"
+                        class="w-full bg-black/40 border border-white/5 rounded-xl py-3.5 pl-12 pr-4 text-white focus:outline-none focus:border-[#00ff9d]/50 focus:ring-1 focus:ring-[#00ff9d]/50 transition-all placeholder-gray-600 shadow-inner"
+                        placeholder="farmer@agrisense.ai" required>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Password</label>
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-[#00ff9d]">
+                        <i class="fa-solid fa-lock text-gray-500 group-focus-within:text-[#00ff9d] transition-colors"></i>
+                    </div>
+                    <input type="password" name="password"
+                        class="w-full bg-black/40 border border-white/5 rounded-xl py-3.5 pl-12 pr-4 text-white focus:outline-none focus:border-[#00ff9d]/50 focus:ring-1 focus:ring-[#00ff9d]/50 transition-all placeholder-gray-600 shadow-inner"
+                        placeholder="••••••••" required>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <input type="checkbox" id="remember"
+                        class="w-4 h-4 rounded border-gray-600 text-[#00ff9d] focus:ring-[#00ff9d]/50 bg-black/50 border-white/10 accent-[#00ff9d]">
+                    <label for="remember" class="ml-2 text-sm text-gray-400 select-none cursor-pointer">Remember me</label>
+                </div>
+                <a href="#" class="text-sm text-[#00ff9d] hover:text-white transition font-medium">Forgot password?</a>
+            </div>
+
+            <button type="submit"
+                class="w-full bg-[#00ff9d] hover:bg-[#00e68a] text-[#020617] font-bold py-4 rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] hover:shadow-[0_0_30px_rgba(0,255,157,0.4)] transition-all duration-300 transform hover:-translate-y-1 text-lg uppercase tracking-wide">
+                Sign In to Dashboard
+            </button>
+
+            <p class="text-center text-sm text-gray-400 mt-6 font-medium">
+                Don't have an account? <a href="{{ url_for('register') }}"
+                    class="text-[#00ff9d] hover:text-white transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 hover:after:w-full after:bg-white after:transition-all">Create one</a>
+            </p>
+        </form>
+
+        <p class="mt-8 text-center text-xs text-gray-500">
+            &copy; 2026 AgriSense AI Solutions. All rights reserved.
+        </p>
+    </div>
+
+</body>
+
+</html>

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Analytics & Trends{% endblock %}
+
+{% block content %}
+<div class="glass-card p-6 mb-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h3 class="font-bold text-lg">Historical Data</h3>
+            <p class="text-sm text-gray-400">Sensor trends over time</p>
+        </div>
+        <div class="flex gap-2">
+            <button class="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition">1H</button>
+            <button class="px-3 py-1 bg-[#00d27f]/20 text-[#00d27f] rounded text-sm font-medium border border-[#00d27f]/30">24H</button>
+            <button class="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-sm transition">7D</button>
+        </div>
+    </div>
+    
+    <div class="chart-container" style="height: 400px;">
+        <canvas id="historyChart"></canvas>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="glass-card p-6 text-center">
+        <div class="text-[#00d27f] text-3xl mb-2"><i class="fa-solid fa-droplet"></i></div>
+        <h4 class="text-gray-400 text-sm mb-1">Avg Moisture</h4>
+        <p class="text-2xl font-bold">42.5%</p>
+    </div>
+    <div class="glass-card p-6 text-center">
+        <div class="text-[#ffa502] text-3xl mb-2"><i class="fa-solid fa-temperature-half"></i></div>
+        <h4 class="text-gray-400 text-sm mb-1">Avg Temp</h4>
+        <p class="text-2xl font-bold">28.3°C</p>
+    </div>
+    <div class="glass-card p-6 text-center">
+        <div class="text-[#1e90ff] text-3xl mb-2"><i class="fa-solid fa-faucet-drip"></i></div>
+        <h4 class="text-gray-400 text-sm mb-1">Monthly Water Usage</h4>
+        <p class="text-2xl font-bold"><span id="analytics-water-month">--</span> L</p>
+        <p class="text-xs text-[#00d27f] mt-1">Calculated from AI Cycles</p>
+    </div>
+</div>
+{% endblock %}

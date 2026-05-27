@@ -1,0 +1,353 @@
+/* 
+ * GROW Dashboard Core Stylesheet
+ * Custom Dark Theme, Glassmorphism and Telemetry Animations
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    --bg-dark: #080d16;
+    --sidebar-bg: rgba(10, 16, 28, 0.7);
+    --card-bg: rgba(17, 25, 40, 0.45);
+    --border-light: rgba(255, 255, 255, 0.07);
+    --border-glow-green: rgba(0, 255, 157, 0.35);
+    
+    /* Harmonious HSL tailormade palettes */
+    --accent-glow: #00ff9d;
+    --accent-orange: #ff9f43;
+    --accent-blue: #00d2ff;
+    --text-white: #ffffff;
+    --text-gray: #8f9cae;
+    --text-muted: #5e6b7e;
+    
+    --success: #00ff9d;
+    --warning: #ff9f43;
+    --danger: #ff4d4d;
+    
+    --font-outfit: 'Outfit', sans-serif;
+    --font-jakarta: 'Plus Jakarta Sans', sans-serif;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-white);
+    font-family: var(--font-jakarta);
+    background-image: 
+        radial-gradient(circle at 5% 15%, rgba(0, 255, 157, 0.08), transparent 35%),
+        radial-gradient(circle at 95% 85%, rgba(0, 210, 255, 0.1), transparent 45%),
+        linear-gradient(rgba(8, 13, 22, 0.86), rgba(8, 13, 22, 0.86)),
+        url('../images/grass_bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Base Typo Styles */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-outfit);
+}
+
+/* Custom Scrollbar for Sleek Aesthetic */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(8, 13, 22, 0.5);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 157, 0.3);
+}
+
+/* Glassmorphism Panel system */
+.glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid var(--border-light);
+    border-radius: 24px;
+    box-shadow: 
+        0 20px 40px -15px rgba(0, 0, 0, 0.7),
+        inset 0 1px 1px rgba(255, 255, 255, 0.06);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 
+        0 24px 50px -10px rgba(0, 0, 0, 0.85),
+        inset 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+
+/* Sidebar Custom Styling */
+.sidebar {
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border-right: 1px solid var(--border-light);
+}
+
+.nav-item {
+    font-family: var(--font-outfit);
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    color: var(--text-gray);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 12px;
+    margin: 4px 16px;
+    padding: 10px 16px;
+    border: 1.5px solid transparent;
+}
+
+.nav-item:hover {
+    color: var(--text-white);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Active sidebar items styled exactly like GROW mockup design */
+.nav-item.active {
+    color: var(--success);
+    background: rgba(0, 255, 157, 0.08);
+    border-color: rgba(0, 255, 157, 0.4);
+    box-shadow: 
+        0 0 20px rgba(0, 255, 157, 0.12),
+        inset 0 1px 1px rgba(0, 255, 157, 0.05);
+    text-shadow: 0 0 10px rgba(0, 255, 157, 0.3);
+}
+
+/* Circular Gauge Visualizer CSS */
+.gauge-container {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gauge-svg {
+    transform: rotate(-90deg);
+}
+
+.gauge-track {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.04);
+    stroke-width: 14px;
+}
+
+.gauge-fill {
+    fill: none;
+    stroke-linecap: round;
+    stroke-width: 14px;
+    transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: drop-shadow(0 0 8px currentColor);
+}
+
+.gauge-center-text {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+/* Animated Wavy Soil Layer inside cards */
+.soil-wave-wrapper {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 40px;
+    overflow: hidden;
+    pointer-events: none;
+    border-bottom-left-radius: 22px;
+    border-bottom-right-radius: 22px;
+    opacity: 0.85;
+}
+
+.soil-wave-svg {
+    position: absolute;
+    bottom: -1px;
+    width: 200%;
+    height: 100%;
+    fill: url(#soil-grad);
+}
+
+.soil-wave-1 {
+    animation: wave-slide 12s linear infinite;
+}
+
+.soil-wave-2 {
+    animation: wave-slide-reverse 8s linear infinite;
+    opacity: 0.6;
+}
+
+@keyframes wave-slide {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+@keyframes wave-slide-reverse {
+    0% { transform: translateX(-50%); }
+    100% { transform: translateX(0); }
+}
+
+/* Dynamic status log states */
+.log-item {
+    position: relative;
+    padding-left: 18px;
+    border-left: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+.log-item::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 5px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+
+.log-item.critical::before {
+    background: var(--danger);
+    box-shadow: 0 0 8px var(--danger);
+}
+
+.log-item.override::before {
+    background: var(--warning);
+    box-shadow: 0 0 8px var(--warning);
+}
+
+.log-item.success::before {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+/* Neon glow tags */
+.glow-badge-green {
+    background: rgba(0, 255, 157, 0.08);
+    border: 1px solid rgba(0, 255, 157, 0.25);
+    color: var(--success);
+    box-shadow: 0 0 10px rgba(0, 255, 157, 0.1);
+}
+
+.glow-badge-orange {
+    background: rgba(255, 159, 67, 0.08);
+    border: 1px solid rgba(255, 159, 67, 0.25);
+    color: var(--warning);
+    box-shadow: 0 0 10px rgba(255, 159, 67, 0.1);
+}
+
+.glow-badge-red {
+    background: rgba(255, 77, 77, 0.08);
+    border: 1px solid rgba(255, 77, 77, 0.25);
+    color: var(--danger);
+    box-shadow: 0 0 10px rgba(255, 77, 77, 0.1);
+}
+
+.glow-badge-blue {
+    background: rgba(0, 210, 255, 0.08);
+    border: 1px solid rgba(0, 210, 255, 0.25);
+    color: var(--accent-blue);
+    box-shadow: 0 0 10px rgba(0, 210, 255, 0.1);
+}
+
+/* Micro animations for icons and hover */
+.hover-glow:hover {
+    filter: drop-shadow(0 0 8px var(--success));
+}
+
+@keyframes heartbeat {
+    0% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.4; }
+}
+
+.heart-pulse {
+    animation: heartbeat 2.5s ease-in-out infinite;
+}
+
+
+
+/* --- CARD STATE OVERLAYS --- */
+.card-state-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    background: rgba(8, 13, 22, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 24px;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-card.state-offline .card-state-overlay.offline-overlay,
+.glass-card.state-unconfigured .card-state-overlay.unconfigured-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Offline state styling for primary card */
+.glass-card.state-offline {
+    border-color: rgba(255, 77, 77, 0.2) !important;
+    box-shadow: 0 15px 35px -10px rgba(255, 77, 77, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.03);
+}
+
+/* Unconfigured state styling for optional gardens */
+.glass-card.state-unconfigured {
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    background: rgba(17, 25, 40, 0.15);
+    box-shadow: none;
+}
+
+.glass-card.state-unconfigured:hover {
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    background: rgba(17, 25, 40, 0.25);
+}
+
+/* Modern dashed/plus node binder buttons */
+.bind-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    color: var(--text-gray);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.bind-btn:hover {
+    background: rgba(0, 255, 157, 0.08);
+    border-style: solid;
+    border-color: var(--success);
+    color: var(--success);
+    box-shadow: 0 0 15px rgba(0, 255, 157, 0.2);
+    transform: translateY(-2px);
+}
