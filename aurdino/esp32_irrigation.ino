@@ -9,8 +9,8 @@ const char *ssid = "Shivaraja.ss";
 const char *password = "7411132938";
 
 // ---------------- SERVER URL ----------------
-// Replace with your live Render URL, e.g. "https://your-app-name.onrender.com/api/sensor"
-const char *serverUrl = "https://your-app-name.onrender.com/api/sensor";
+// Replace with your live ngrok or local server URL
+const char *serverUrl = "http://10.169.20.56:5000/api/sensor";
 
 // ---------------- GPS DETAILS ----------------
 const int rxPin = 16; // GPS TX to ESP32 RX2 (GPIO 16)
@@ -29,6 +29,12 @@ const int pumpPin = 26; // Onboard LED / Relay control pin
 bool pumpActive = false;
 unsigned long pumpStartTime = 0;
 const unsigned long pumpCycleDuration = 12000; // 12-second automatic shutoff
+const float sufficientMoistureThreshold = 45.0; // Turn off pump if moisture exceeds this percentage
+
+// Calibration constants for your soil moisture sensor
+// (Adjust these values based on your Serial Monitor readings)
+const int DRY_VALUE = 4095; // Raw sensor reading in dry air (approx. 0%)
+const int WET_VALUE = 1500; // Raw sensor reading in water/very wet soil (approx. 100%)
 
 // ---------------- DHT SENSOR ----------------
 #define DHTTYPE DHT11
@@ -46,7 +52,7 @@ void setup()
   dht.begin();
 
   // Heat sensor pin
-  pinMode(heatSensorPin, INPUT);
+  pinMode(heatSensorPin, INPUT_PULLUP);
 
   // Pump pin configuration
   pinMode(pumpPin, OUTPUT);
@@ -111,8 +117,8 @@ void loop()
     // ---------------- SOIL MOISTURE ----------------
     int rawMoisture = analogRead(moisturePin);
 
-    // Convert to %
-    float moisturePercent = map(rawMoisture, 4095, 1500, 0, 100);
+    // Convert to % using calibrated constants
+    float moisturePercent = map(rawMoisture, DRY_VALUE, WET_VALUE, 0, 100);
 
     // Limit values
     if (moisturePercent < 0)
@@ -120,6 +126,18 @@ void loop()
 
     if (moisturePercent > 100)
       moisturePercent = 100;
+
+    // Local safety check: If pump is active but soil moisture has reached sufficient level
+    if (pumpActive && moisturePercent >= sufficientMoistureThreshold)
+    {
+      Serial.print("\n[EVENT] [LOCAL] Moisture level (");
+      Serial.print(moisturePercent);
+      Serial.print("%) exceeds threshold (");
+      Serial.print(sufficientMoistureThreshold);
+      Serial.println("%). Turning pump OFF.");
+      digitalWrite(pumpPin, LOW);
+      pumpActive = false;
+    }
 
     // ---------------- TEMPERATURE ----------------
     float temperature = dht.readTemperature();
@@ -237,6 +255,9 @@ void loop()
     Serial.print(temperature);
     Serial.println(" C");
 
+    Serial.print("Heat Pin Raw (Pin 5): ");
+    Serial.println(digitalRead(heatSensorPin));
+
     Serial.print("Heat Detected: ");
     Serial.println(heatDetected);
 
@@ -271,6 +292,15 @@ void loop()
         digitalWrite(pumpPin, HIGH);
         pumpActive = true;
         pumpStartTime = millis();
+      }
+      else if (response.indexOf("\"water_needed\":false") != -1 || response.indexOf("\"water_needed\": false") != -1)
+      {
+        if (pumpActive)
+        {
+          Serial.println("\n[EVENT] [AUTO] Server recommends: PUMP_OFF (Sufficient Moisture)");
+          digitalWrite(pumpPin, LOW);
+          pumpActive = false;
+        }
       }
     }
     else

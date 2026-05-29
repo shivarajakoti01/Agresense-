@@ -115,6 +115,20 @@
 
             <!-- Topbar right status widget & profile initials -->
             <div class="flex items-center gap-4 md:gap-6">
+                <!-- Global Soil Moisture Widget -->
+                <div class="hidden sm:flex items-center gap-2.5 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+                    <i class="fa-solid fa-droplet text-[#00d2ff] text-xs animate-pulse"></i>
+                    <span class="text-xs font-bold text-gray-400">Soil Moisture:</span>
+                    <span id="global-moisture" class="text-xs font-extrabold text-white">--%</span>
+                </div>
+
+                <!-- Global Surrounding Temp Widget -->
+                <div class="hidden sm:flex items-center gap-2.5 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+                    <i class="fa-solid fa-temperature-three-quarters text-[#ff9f43] text-xs animate-pulse"></i>
+                    <span class="text-xs font-bold text-gray-400">Surrounding Temp:</span>
+                    <span id="global-temp" class="text-xs font-extrabold text-white">--.-°C</span>
+                </div>
+
                 <!-- System Status Summary -->
                 <div class="hidden sm:flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/5">
                     <span id="status-indicator" class="w-2.5 h-2.5 rounded-full bg-[#00ff9d] heart-pulse"></span>

@@ -30,8 +30,19 @@
     </div>
 </div>
 
-<!-- Top Row: System Status & Weather Summary -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+<!-- High Temperature Warning Banner -->
+<div id="high-temp-banner" class="hidden mb-6 bg-orange-950/40 border border-orange-500/50 text-orange-200 px-6 py-4 rounded-2xl flex items-center gap-4 shadow-[0_0_15px_rgba(243,156,18,0.15)]">
+    <div class="bg-orange-500/20 w-10 h-10 rounded-full flex items-center justify-center text-orange-400 text-lg animate-pulse">
+        <i class="fa-solid fa-temperature-high"></i>
+    </div>
+    <div>
+        <h3 class="font-bold text-white text-sm" style="font-family: 'Outfit', sans-serif;">High Heat / Temperature Sensed</h3>
+        <p class="text-xs text-orange-300/80">High temperature detected. Automatic protective irrigation has been activated.</p>
+    </div>
+</div>
+
+<!-- Top Row: System Status, Weather Summary, and Surrounding Temp -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     
     <!-- System Status Widget -->
     <div class="glass-card p-6 flex items-center justify-between">
@@ -40,6 +51,10 @@
             <div class="flex items-center gap-2">
                 <span class="text-xl font-extrabold text-white" style="font-family: 'Outfit';">Active & Auto</span>
                 <span class="w-2.5 h-2.5 rounded-full bg-[#00ff9d] heart-pulse ml-1"></span>
+            </div>
+            <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Pump:</span>
+                <span id="live-pump-status-badge" class="text-[10px] font-extrabold text-gray-500 uppercase">OFF</span>
             </div>
             <p class="text-xs text-gray-500 mt-1">Autonomous ML core active & listening</p>
         </div>
@@ -72,6 +87,21 @@
                 <input type="checkbox" id="dashboard-weather-toggle" class="sr-only peer" onchange="toggleDashboardWeather(this)">
                 <div class="w-9 h-5 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00ff9d]"></div>
             </label>
+        </div>
+    </div>
+
+    <!-- Surrounding Temperature Widget (Live Field Sensor) -->
+    <div id="temp-card-live" class="glass-card p-6 flex items-center justify-between relative overflow-hidden group">
+        <div>
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Surrounding Temp</span>
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-temperature-three-quarters text-lg text-[#ff9f43] animate-pulse"></i>
+                <span id="dashboard-live-temp" class="text-xl font-extrabold text-white" style="font-family: 'Outfit';">--.-°C</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Live from DHT11 field sensor</p>
+        </div>
+        <div class="bg-[#ff9f43]/5 border border-[#ff9f43]/20 px-3 py-1.5 rounded-xl">
+            <span id="temp-status-label" class="text-xs font-bold text-[#ff9f43] uppercase tracking-wider">● Normal</span>
         </div>
     </div>
 </div>

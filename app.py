@@ -466,8 +466,28 @@ def receive_sensor_data():
         last_valid_temp = temperature
         ai_result = irrigation_ai.predict(moisture, temperature)
         
+        # Check if heat or fire is detected ("more than in range")
+        is_heat_sensed = heat_detected or (temperature > high_temp_thresh)
+        
+        # Check if soil is in critical need of water (below user-configured dry threshold)
+        is_critically_dry = moisture < dry_thresh
+        
+        if is_heat_sensed:
+            ai_result['water_needed'] = True
+            if heat_detected:
+                ai_result['soil_condition'] = "Fire Warning"
+                ai_result['recommendation'] = "CRITICAL: Flame/Fire detected! Turning pump ON immediately to extinguish."
+            else:
+                ai_result['soil_condition'] = "High Heat"
+                ai_result['recommendation'] = f"High Temperature Sensed ({temperature}°C) above safe range. Turning pump ON to protect crops."
+        elif is_critically_dry:
+            ai_result['water_needed'] = True
+            ai_result['soil_condition'] = "Critical Dry"
+            ai_result['recommendation'] = "Soil is critically dry (mainly needed). Irrigating immediately."
+        
         # Weather API Integration
-        if ai_result['water_needed'] and weather_enabled:
+        # Weather override only applies if there is NO fire/heat detected and soil is NOT critically dry.
+        if ai_result['water_needed'] and weather_enabled and not is_critically_dry and not is_heat_sensed:
             try:
                 weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=precipitation_probability&forecast_days=1"
                 resp = requests.get(weather_url, timeout=3)

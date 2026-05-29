@@ -262,10 +262,93 @@ function updateUI(data) {
         liveTempValue = data.sensor.temperature;
     }
 
+    const isOffline = (data.sensor_status === 'Offline / Failing');
+
+    // Global Topbar Soil Moisture
+    const globalMoistureEl = document.getElementById('global-moisture');
+    if (globalMoistureEl) {
+        globalMoistureEl.textContent = isOffline ? '--%' : `${liveMoistureValue.toFixed(0)}%`;
+    }
+
+    // Global Topbar Surrounding Temp
+    const globalTempEl = document.getElementById('global-temp');
+    if (globalTempEl) {
+        globalTempEl.textContent = isOffline ? '--.-°C' : `${liveTempValue.toFixed(1)}°C`;
+    }
+
+    // Dashboard Live Temp Widget
+    const dashboardLiveTemp = document.getElementById('dashboard-live-temp');
+    if (dashboardLiveTemp) {
+        dashboardLiveTemp.textContent = isOffline ? '--.-°C' : `${liveTempValue.toFixed(1)}°C`;
+    }
+
+    const tempStatusLabel = document.getElementById('temp-status-label');
+    if (tempStatusLabel) {
+        if (isOffline) {
+            tempStatusLabel.textContent = '● Offline';
+            tempStatusLabel.className = 'text-xs font-bold text-red-500 uppercase tracking-wider';
+        } else {
+            // Check high temp warning
+            const hasHighTemp = data.alerts && data.alerts.some(a => a.alert_type === 'High Temp');
+            if (hasHighTemp) {
+                tempStatusLabel.textContent = '● High Heat';
+                tempStatusLabel.className = 'text-xs font-bold text-orange-500 uppercase tracking-wider';
+            } else {
+                tempStatusLabel.textContent = '● Normal';
+                tempStatusLabel.className = 'text-xs font-bold text-[#00ff9d] uppercase tracking-wider';
+            }
+        }
+    }
+
+    // Sensor Status Page values
+    const statusMoistureVal = document.getElementById('status-moisture-val');
+    const statusTempVal = document.getElementById('status-temp-val');
+    if (statusMoistureVal) {
+        statusMoistureVal.textContent = isOffline ? 'Offline' : `Active (${liveMoistureValue.toFixed(1)}%)`;
+        statusMoistureVal.className = isOffline ? 'font-medium text-red-500' : 'font-medium text-[#00ff9d]';
+    }
+    if (statusTempVal) {
+        statusTempVal.textContent = isOffline ? 'Offline' : `Active (${liveTempValue.toFixed(1)}°C)`;
+        statusTempVal.className = isOffline ? 'font-medium text-red-500' : 'font-medium text-[#00ff9d]';
+    }
+
+    // Live Pump Status Badge & Trigger Button Update
+    const livePumpStatusBadge = document.getElementById('live-pump-status-badge');
+    const pumpIsActive = data.sensor && data.sensor.pump_status;
+
+    if (livePumpStatusBadge) {
+        if (isOffline) {
+            livePumpStatusBadge.textContent = 'OFFLINE';
+            livePumpStatusBadge.className = 'text-[10px] font-extrabold text-red-500 uppercase';
+        } else if (pumpIsActive) {
+            livePumpStatusBadge.textContent = 'ON / RUNNING';
+            livePumpStatusBadge.className = 'text-[10px] font-extrabold text-[#00ff9d] uppercase animate-pulse';
+        } else {
+            livePumpStatusBadge.textContent = 'OFF';
+            livePumpStatusBadge.className = 'text-[10px] font-extrabold text-gray-500 uppercase';
+        }
+    }
+
+    const triggerBtn = document.querySelector('button[onclick="triggerManualPump()"]');
+    if (triggerBtn) {
+        if (isOffline) {
+            triggerBtn.disabled = true;
+            triggerBtn.innerHTML = `<i class="fa-solid fa-ban text-[10px]"></i> Trigger Pump`;
+            triggerBtn.className = 'w-full bg-gray-800 text-gray-500 font-extrabold py-3.5 px-4 rounded-xl cursor-not-allowed text-xs uppercase tracking-widest flex items-center justify-center gap-2';
+        } else if (pumpIsActive) {
+            triggerBtn.disabled = false;
+            triggerBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin text-[10px]"></i> Pump Running...`;
+            triggerBtn.className = 'w-full bg-[#00d2ff] hover:bg-[#00b0d9] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,210,255,0.2)] transition-all duration-300 text-xs uppercase tracking-widest flex items-center justify-center gap-2';
+        } else {
+            triggerBtn.disabled = false;
+            triggerBtn.innerHTML = `<i class="fa-solid fa-play text-[10px]"></i> Trigger Pump`;
+            triggerBtn.className = 'w-full bg-[#00ff9d] hover:bg-[#00d27f] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] hover:shadow-[0_0_30px_rgba(0,255,157,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 text-xs uppercase tracking-widest flex items-center justify-center gap-2';
+        }
+    }
+
     const card1 = document.getElementById('soil-card-1');
     const card2 = document.getElementById('soil-card-2');
     const card3 = document.getElementById('soil-card-3');
-    const isOffline = (data.sensor_status === 'Offline / Failing');
 
     // 1. Dynamic Card States & Visibility Management
     if (isOffline) {
@@ -468,12 +551,62 @@ function updateUI(data) {
         `;
     }
 
-    // Check for Fire Alarm
+    // Check for Fire Alarm & High Temp Banners
     if (data.alerts) {
         const hasFire = data.alerts.some(a => a.alert_type === 'Fire Warning');
         const fireAlarmEl = document.getElementById('fire-alarm');
         if (fireAlarmEl && hasFire && !window.fireAlarmDismissed && fireAlarmEl.classList.contains('hidden')) {
             fireAlarmEl.classList.remove('hidden');
+        }
+
+        const hasHighTemp = data.alerts.some(a => a.alert_type === 'High Temp');
+        const highTempBanner = document.getElementById('high-temp-banner');
+        if (highTempBanner) {
+            if (hasHighTemp && !isOffline) {
+                highTempBanner.classList.remove('hidden');
+            } else {
+                highTempBanner.classList.add('hidden');
+            }
+        }
+    }
+
+    // Populate System Alerts Page container
+    const alertsContainer = document.getElementById('alerts-container');
+    if (alertsContainer) {
+        if (!data.alerts || data.alerts.length === 0) {
+            alertsContainer.innerHTML = '<p class="text-center text-gray-500 py-8">No active alerts.</p>';
+        } else {
+            alertsContainer.innerHTML = '';
+            data.alerts.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `p-4 rounded-xl border flex justify-between items-center bg-yellow-950/20 border-yellow-500/20 text-yellow-200`;
+                let iconClass = 'fa-triangle-exclamation text-yellow-400 bg-yellow-500/20';
+                let typeClass = 'bg-yellow-500 text-[#080d16]';
+                
+                if (alert.alert_type === 'Fire Warning') {
+                    alertDiv.className = `p-4 rounded-xl border flex justify-between items-center bg-red-950/40 border-red-500/50 text-red-100 shadow-[0_0_15px_rgba(255,77,77,0.1)]`;
+                    iconClass = 'fa-fire text-red-400 bg-red-500/20 animate-pulse';
+                    typeClass = 'bg-red-500 text-white';
+                } else if (alert.alert_type === 'High Temp') {
+                    alertDiv.className = `p-4 rounded-xl border flex justify-between items-center bg-orange-950/20 border-orange-500/20 text-orange-200`;
+                    iconClass = 'fa-temperature-high text-orange-400 bg-orange-500/20';
+                    typeClass = 'bg-orange-500 text-[#080d16]';
+                }
+                
+                alertDiv.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center ${iconClass.split(' ').slice(2).join(' ')}">
+                            <i class="fa-solid ${iconClass.split(' ')[0]}"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-sm text-white">${alert.message}</p>
+                            <p class="text-[10px] text-gray-500">${new Date(alert.timestamp + ' UTC').toLocaleString()}</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded ${typeClass}">${alert.alert_type}</span>
+                `;
+                alertsContainer.appendChild(alertDiv);
+            });
         }
     }
 }
