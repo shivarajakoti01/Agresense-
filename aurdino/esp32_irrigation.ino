@@ -9,8 +9,8 @@ const char *ssid = "Shivaraja.ss";
 const char *password = "7411132938";
 
 // ---------------- SERVER URL ----------------
-// Replace with your live ngrok or local server URL
-const char *serverUrl = "http://10.169.20.56:5000/api/sensor";
+// Replace with your live Render server URL
+const char *serverUrl = "https://agresense.onrender.com/api/sensor";
 
 // ---------------- GPS DETAILS ----------------
 const int rxPin = 16; // GPS TX to ESP32 RX2 (GPIO 16)
