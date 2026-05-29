@@ -1,6 +1,5 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <DHT.h>
 #include <TinyGPS++.h>
 #include <HardwareSerial.h>
 
@@ -21,7 +20,6 @@ HardwareSerial neogps(2); // Use Hardware Serial2
 
 // ---------------- SENSOR PINS ----------------
 const int moisturePin = 34;
-const int dhtPin = 4;
 const int heatSensorPin = 5;
 const int pumpPin = 26; // Onboard LED / Relay control pin
 
@@ -36,10 +34,6 @@ const float sufficientMoistureThreshold = 45.0; // Turn off pump if moisture exc
 const int DRY_VALUE = 4095; // Raw sensor reading in dry air (approx. 0%)
 const int WET_VALUE = 1500; // Raw sensor reading in water/very wet soil (approx. 100%)
 
-// ---------------- DHT SENSOR ----------------
-#define DHTTYPE DHT11
-DHT dht(dhtPin, DHTTYPE);
-
 void setup()
 {
 
@@ -47,9 +41,6 @@ void setup()
 
   // Start GPS Serial
   neogps.begin(9600, SERIAL_8N1, rxPin, txPin);
-
-  // Start DHT
-  dht.begin();
 
   // Heat sensor pin
   pinMode(heatSensorPin, INPUT_PULLUP);
@@ -139,17 +130,6 @@ void loop()
       pumpActive = false;
     }
 
-    // ---------------- TEMPERATURE ----------------
-    float temperature = dht.readTemperature();
-
-    // DHT fail protection
-    if (isnan(temperature))
-    {
-
-      Serial.println("DHT Sensor Error!");
-
-      temperature = 25.0;
-    }
 
     // ---------------- HEAT SENSOR ----------------
     bool heatDetected = !digitalRead(heatSensorPin); // Active-low: LOW (0) means fire/heat detected
@@ -221,7 +201,6 @@ void loop()
     // ---------------- CREATE JSON ----------------
     String jsonString = "{";
     jsonString += "\"moisture\":" + String(moisturePercent, 2);
-    jsonString += ",\"temperature\":" + String(temperature, 2);
     jsonString += ",\"heat_detected\":" + String(heatDetected ? "true" : "false");
     jsonString += ",\"gps_valid\":" + String(gpsValid ? "true" : "false");
     if (gpsValid)
@@ -251,9 +230,6 @@ void loop()
     Serial.print(moisturePercent);
     Serial.println("%");
 
-    Serial.print("Temperature: ");
-    Serial.print(temperature);
-    Serial.println(" C");
 
     Serial.print("Heat Pin Raw (Pin 5): ");
     Serial.println(digitalRead(heatSensorPin));

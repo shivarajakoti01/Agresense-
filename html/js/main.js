@@ -282,6 +282,7 @@ function updateUI(data) {
         dashboardLiveTemp.textContent = isOffline ? '--.-°C' : `${liveTempValue.toFixed(1)}°C`;
     }
 
+
     const tempStatusLabel = document.getElementById('temp-status-label');
     if (tempStatusLabel) {
         if (isOffline) {

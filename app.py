@@ -363,16 +363,38 @@ def settings():
 
 # ---- API ENDPOINTS ----
 
+last_weather_temp = 25.0
+last_weather_fetch_time = None
+
+def get_current_weather_temp(lat, lon):
+    global last_weather_temp, last_weather_fetch_time
+    now = datetime.utcnow()
+    # Cache for 15 minutes (900 seconds)
+    if last_weather_fetch_time is None or (now - last_weather_fetch_time).total_seconds() > 900:
+        try:
+            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m&forecast_days=1"
+            resp = requests.get(weather_url, timeout=2)
+            if resp.status_code == 200:
+                wdata = resp.json()
+                temp_array = wdata.get('hourly', {}).get('temperature_2m', [])
+                if temp_array:
+                    last_weather_temp = temp_array[0]
+                    last_weather_fetch_time = now
+                    print(f"Updated cached weather temperature: {last_weather_temp}C")
+        except Exception as e:
+            print(f"Failed to fetch weather temp: {e}")
+    return last_weather_temp
+
 @app.route('/api/sensor', methods=['POST'])
 def receive_sensor_data():
     global last_valid_moisture, last_valid_temp, _settings, manual_trigger_pending, manual_trigger_flag
     data = request.json
     
-    if not data or 'moisture' not in data or 'temperature' not in data:
+    if not data or 'moisture' not in data:
         return jsonify({'error': 'Invalid data'}), 400
         
     moisture = data['moisture']
-    temperature = data['temperature']
+    temperature = data.get('temperature', 25.0)
     heat_detected = data.get('heat_detected', False)
     pump_status = data.get('pump_status', False)
     
@@ -417,6 +439,11 @@ def receive_sensor_data():
         if client_ip:
             threading.Thread(target=geolocate_esp32_ip, args=(client_ip,), daemon=True).start()
             
+    # Overwrite temperature always with weather API temperature since DHT11 sensor is not present
+    lat = _settings.get("latitude", 12.9172)
+    lon = _settings.get("longitude", 74.856)
+    temperature = get_current_weather_temp(lat, lon)
+
     # Save reading to CSV file
     csv_folder = os.path.join(basedir, 'csv_data')
     os.makedirs(csv_folder, exist_ok=True)

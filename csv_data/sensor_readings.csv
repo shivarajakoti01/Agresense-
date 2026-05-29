@@ -1199,3 +1199,5 @@ timestamp,moisture,temperature,heat_detected
 2026-05-29 09:43:45,0.0,25.0,True,True
 2026-05-29 09:43:56,0.0,25.0,True,True
 2026-05-29 09:44:07,0.0,25.0,True,True
+2026-05-29 20:39:40,35.0,26.1,False,False
+2026-05-29 20:44:16,35.0,25.1,False,False

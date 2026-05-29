@@ -8,5 +8,6 @@
     "longitude": 74.9848446,
     "auto_location_enabled": false,
     "location_name": "[Manual] Neeru Marga, Benjana Padavu, Karnataka",
-    "pump_flow_rate": 8.8
+    "pump_flow_rate": 8.8,
+    "dht_sensor_enabled": true
 }
