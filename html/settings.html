@@ -96,6 +96,22 @@
         </div>
     </div>
 
+    <!-- Sensor Hardware Calibration -->
+    <div class="mb-10">
+        <h3 class="text-xl font-bold text-white mb-6 border-b border-white/10 pb-3" style="font-family: 'Outfit', sans-serif;">Soil Sensor Hardware Calibration</h3>
+        <p class="text-xs text-gray-400 mb-4">Calibrate your soil moisture sensor raw ADC readings to scale them perfectly to 0% - 100%.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Raw Value in Dry Air (0% moisture)</label>
+                <input type="number" id="sensor-dry-raw" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors" placeholder="e.g. 4095">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Raw Value in Wet Water (100% moisture)</label>
+                <input type="number" id="sensor-wet-raw" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors" placeholder="e.g. 1500">
+            </div>
+        </div>
+    </div>
+
     <!-- Location Settings -->
     <div class="mb-10">
         <div class="flex justify-between items-center mb-6 border-b border-white/10 pb-3">
@@ -285,6 +301,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('latitude').value = data.latitude;
             document.getElementById('longitude').value = data.longitude;
             
+            document.getElementById('sensor-dry-raw').value = data.sensor_dry_raw || 4095;
+            document.getElementById('sensor-wet-raw').value = data.sensor_wet_raw || 1500;
+            
             const autoLocToggle = document.getElementById('auto-location-toggle');
             autoLocToggle.checked = data.auto_location_enabled;
             toggleAutoLocationInput(autoLocToggle);
@@ -311,6 +330,9 @@ async function saveAllSettings() {
     const high_temp_threshold = parseInt(document.getElementById('high-temp-threshold').value);
     const auto_location_enabled = document.getElementById('auto-location-toggle').checked;
     
+    const sensor_dry_raw = parseInt(document.getElementById('sensor-dry-raw').value) || 4095;
+    const sensor_wet_raw = parseInt(document.getElementById('sensor-wet-raw').value) || 1500;
+    
     const latitude = document.getElementById('latitude').value ? parseFloat(document.getElementById('latitude').value) : null;
     const longitude = document.getElementById('longitude').value ? parseFloat(document.getElementById('longitude').value) : null;
     const location_query = document.getElementById('location-query').value;
@@ -330,7 +352,9 @@ async function saveAllSettings() {
             high_temp_threshold,
             auto_location_enabled,
             location_query,
-            pump_flow_rate
+            pump_flow_rate,
+            sensor_dry_raw,
+            sensor_wet_raw
         };
         
         if (latitude !== null && longitude !== null) {
@@ -356,6 +380,9 @@ async function saveAllSettings() {
             if (reloadResponse.ok) {
                 document.getElementById('latitude').value = reloadData.latitude;
                 document.getElementById('longitude').value = reloadData.longitude;
+                
+                document.getElementById('sensor-dry-raw').value = reloadData.sensor_dry_raw || 4095;
+                document.getElementById('sensor-wet-raw').value = reloadData.sensor_wet_raw || 1500;
                 
                 const autoToggle = document.getElementById('auto-location-toggle');
                 autoToggle.checked = reloadData.auto_location_enabled;

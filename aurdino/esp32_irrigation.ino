@@ -211,6 +211,7 @@ void loop()
     String jsonString = "{";
     jsonString += "\"node_id\":\"" + String(nodeId) + "\"";
     jsonString += ",\"moisture\":" + String(moisturePercent, 2);
+    jsonString += ",\"raw_moisture\":" + String(rawMoisture);
     jsonString += ",\"heat_detected\":" + String(heatDetected ? "true" : "false");
     jsonString += ",\"gps_valid\":" + String(gpsValid ? "true" : "false");
     if (gpsValid)

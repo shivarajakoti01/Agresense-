@@ -502,6 +502,11 @@ function updateUI(data) {
         moistureEl.textContent = isOffline ? '--%' : `${liveMoistureValue.toFixed(0)}%`;
         setCircularGauge('moisture-gauge-1', isOffline ? 0 : liveMoistureValue);
         
+        const moistureRawEl = document.getElementById('live-moisture-raw');
+        if (moistureRawEl) {
+            moistureRawEl.textContent = isOffline ? 'Raw: --' : `Raw: ${data.raw_moisture || '--'}`;
+        }
+        
         const status1 = document.getElementById('moisture-status-1');
         if (status1) {
             if (isOffline) {

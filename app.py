@@ -39,7 +39,9 @@ def load_settings():
         "longitude": 74.856,
         "auto_location_enabled": True,
         "location_name": "auto-detected location",
-        "pump_flow_rate": 5.0
+        "pump_flow_rate": 5.0,
+        "sensor_dry_raw": 4095,
+        "sensor_wet_raw": 1500
     }
     if os.path.exists(SETTINGS_FILE):
         try:
@@ -78,6 +80,7 @@ _esp32_state = {
     "gps_valid": False,
     "location_source": "none"
 }
+last_raw_moisture = 4095
 
 def auto_detect_location():
     global _settings
@@ -454,7 +457,7 @@ def get_current_weather_temp(lat, lon):
 
 @app.route('/api/sensor', methods=['POST'])
 def receive_sensor_data():
-    global last_valid_moisture, last_valid_temp, _settings, manual_trigger_pending, manual_trigger_flag, _esp32_state, manual_stop_pending
+    global last_valid_moisture, last_valid_temp, _settings, manual_trigger_pending, manual_trigger_flag, _esp32_state, manual_stop_pending, last_raw_moisture
     data = request.json
     
     if not data or 'moisture' not in data:
@@ -465,6 +468,22 @@ def receive_sensor_data():
     heat_detected = data.get('heat_detected', False)
     pump_status = data.get('pump_status', False)
     node_id = data.get('node_id', 'AGR-Node-001')
+
+    # Get raw moisture or reconstruct it
+    raw_moisture = data.get('raw_moisture')
+    if raw_moisture is None:
+        # Reconstruct raw moisture from pre-mapped moisture percent
+        raw_moisture = int((moisture / 100.0) * (1500 - 4095) + 4095)
+    
+    # Save the raw moisture in memory
+    last_raw_moisture = raw_moisture
+
+    # Apply backend user calibration if dry/wet thresholds are configured
+    dry_val = _settings.get("sensor_dry_raw", 4095)
+    wet_val = _settings.get("sensor_wet_raw", 1500)
+    if dry_val != wet_val:
+        moisture = float((raw_moisture - dry_val) * 100.0 / (wet_val - dry_val))
+        moisture = max(0.0, min(100.0, moisture))
     
     # Handle incoming GPS data from ESP32 module
     gps_valid = data.get('gps_valid', False)
@@ -846,6 +865,7 @@ def get_live_data():
             'seconds_since_last_seen': node_seconds_since_last_seen
         }
 
+    global last_raw_moisture
     response = {
         'sensor': latest_reading.to_dict() if latest_reading else None,
         'prediction': latest_pred.to_dict() if latest_pred else None,
@@ -860,6 +880,7 @@ def get_live_data():
         'longitude': _settings.get("longitude", 74.856),
         'location_name': _settings.get("location_name", "Unknown Location"),
         'auto_location_enabled': _settings.get("auto_location_enabled", True),
+        'raw_moisture': last_raw_moisture,
         'nodes': nodes_data
     }
     return jsonify(response)
@@ -1000,11 +1021,12 @@ def handle_settings():
 
         # Update other settings keys
         for key in ['weather_prediction_enabled', 'fallback_mode_enabled', 'retraining_frequency', 
-                    'dry_threshold', 'high_temp_threshold', 'auto_location_enabled', 'pump_flow_rate']:
+                    'dry_threshold', 'high_temp_threshold', 'auto_location_enabled', 'pump_flow_rate',
+                    'sensor_dry_raw', 'sensor_wet_raw']:
             if key in data:
                 if key in ['weather_prediction_enabled', 'fallback_mode_enabled', 'auto_location_enabled']:
                     _settings[key] = bool(data[key])
-                elif key in ['retraining_frequency', 'dry_threshold', 'high_temp_threshold']:
+                elif key in ['retraining_frequency', 'dry_threshold', 'high_temp_threshold', 'sensor_dry_raw', 'sensor_wet_raw']:
                     _settings[key] = int(data[key])
                 elif key == 'pump_flow_rate':
                     _settings[key] = float(data[key])
