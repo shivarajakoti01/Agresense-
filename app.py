@@ -39,8 +39,7 @@ def load_settings():
         "longitude": 74.856,
         "auto_location_enabled": True,
         "location_name": "auto-detected location",
-        "pump_flow_rate": 5.0,
-        "google_maps_api_key": ""
+        "pump_flow_rate": 5.0
     }
     if os.path.exists(SETTINGS_FILE):
         try:
@@ -1000,7 +999,7 @@ def handle_settings():
 
         # Update other settings keys
         for key in ['weather_prediction_enabled', 'fallback_mode_enabled', 'retraining_frequency', 
-                    'dry_threshold', 'high_temp_threshold', 'auto_location_enabled', 'pump_flow_rate', 'google_maps_api_key']:
+                    'dry_threshold', 'high_temp_threshold', 'auto_location_enabled', 'pump_flow_rate']:
             if key in data:
                 if key in ['weather_prediction_enabled', 'fallback_mode_enabled', 'auto_location_enabled']:
                     _settings[key] = bool(data[key])
@@ -1008,8 +1007,6 @@ def handle_settings():
                     _settings[key] = int(data[key])
                 elif key == 'pump_flow_rate':
                     _settings[key] = float(data[key])
-                elif key == 'google_maps_api_key':
-                    _settings[key] = str(data[key]).strip()
                     
         # Update coordinates directly only if explicitly sent (e.g. from browser geolocator bypass)
         if 'latitude' in data and 'longitude' in data:

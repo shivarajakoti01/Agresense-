@@ -107,27 +107,25 @@
         
         <input type="hidden" id="latitude">
         <input type="hidden" id="longitude">
-        
-        <!-- Google Maps API Key Input -->
-        <div class="mb-6">
-            <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Google Maps API Key</label>
-            <input type="text" id="google-maps-key" placeholder="Enter Google Maps API Key to enable the Map Picker and Autocomplete" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors">
-            <p class="text-[10px] text-gray-500 mt-1">Requires an API key with Maps JavaScript, Places, and Geocoding APIs enabled.</p>
+
+        <!-- Auto-Detect Location Toggle -->
+        <div class="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl mb-6">
+            <div>
+                <h4 class="font-bold text-white text-sm" style="font-family: 'Outfit';">Auto-Detect My Location</h4>
+                <p class="text-[10px] text-gray-400">Automatically detect coordinates and local weather using browser location/IP on load.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="auto-location-toggle" class="sr-only peer" onchange="toggleAutoLocationInput(this)">
+                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00ff9d]"></div>
+            </label>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 mb-6">
+        <div class="grid grid-cols-1 gap-6 mb-6" id="manual-location-input-container">
             <div>
                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Location / City Name</label>
                 <input type="text" id="location-query" placeholder="e.g. Mangalore, Bangalore, Mumbai" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors">
                 <p id="current-location-display" class="text-xs text-[#00ff9d] mt-2 font-medium"></p>
             </div>
-        </div>
-
-        <!-- Google Map Container -->
-        <div id="map-container" class="mb-6 hidden">
-            <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Interactive Map Picker</label>
-            <div id="map" class="w-full bg-black/20 border border-white/10 rounded-xl overflow-hidden shadow-inner" style="height: 320px;"></div>
-            <p class="text-[10px] text-gray-500 mt-1.5"><i class="fa-solid fa-circle-info mr-1"></i> Drag the marker or click on the map to choose coordinates.</p>
         </div>
     </div>
 
@@ -171,127 +169,84 @@ async function trainModel(type) {
 
 let googleMapsLoaded = false;
 let googleMap = null;
-let googleMarker = null;
-
-function initGoogleMaps(apiKey, lat, lon) {
-    if (!apiKey) {
-        document.getElementById('map-container').classList.add('hidden');
-        return;
-    }
-    document.getElementById('map-container').classList.remove('hidden');
-    
-    // Set hidden fields
-    if (lat) document.getElementById('latitude').value = lat;
-    if (lon) document.getElementById('longitude').value = lon;
-    
-    if (googleMapsLoaded) {
-        setupMapInstance(lat, lon);
-        return;
-    }
-    
-    window.initMap = function() {
-        googleMapsLoaded = true;
-        setupMapInstance(lat, lon);
-    };
-    
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap`;
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-}
-
-function setupMapInstance(lat, lon) {
-    const defaultLat = parseFloat(lat) || 12.9172;
-    const defaultLng = parseFloat(lon) || 74.856;
-    const myLatLng = { lat: defaultLat, lng: defaultLng };
-    
-    const mapElement = document.getElementById("map");
-    if (!mapElement) return;
-    
-    googleMap = new google.maps.Map(mapElement, {
-        zoom: 13,
-        center: myLatLng,
-        mapTypeControl: false,
-        fullscreenControl: false,
-        styles: [
-            { elementType: "geometry", stylers: [{ color: "#1e293b" }] },
-            { elementType: "labels.text.stroke", stylers: [{ color: "#1e293b" }] },
-            { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
-            { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f172a" }] },
-            { featureType: "road", elementType: "geometry", stylers: [{ color: "#334155" }] }
-        ]
-    });
-    
-    googleMarker = new google.maps.Marker({
-        position: myLatLng,
-        map: googleMap,
-        draggable: true,
-        title: "Drag me to pick your farm location!"
-    });
-    
-    // Drag event
-    google.maps.event.addListener(googleMarker, 'dragend', function() {
-        const pos = googleMarker.getPosition();
-        updateCoordsFromMap(pos.lat(), pos.lng());
-    });
-    
-    // Click event
-    googleMap.addListener("click", (e) => {
-        const pos = e.latLng;
-        googleMarker.setPosition(pos);
-        updateCoordsFromMap(pos.lat(), pos.lng());
-    });
-    
-    // Autocomplete Search integration
-    const searchInput = document.getElementById("location-query");
-    if (searchInput) {
-        const autocomplete = new google.maps.places.Autocomplete(searchInput);
-        autocomplete.bindTo("bounds", googleMap);
-        
-        autocomplete.addListener("place_changed", () => {
-            const place = autocomplete.getPlace();
-            if (!place.geometry || !place.geometry.location) return;
-            
-            if (place.geometry.viewport) {
-                googleMap.fitBounds(place.geometry.viewport);
-            } else {
-                googleMap.setCenter(place.geometry.location);
-                googleMap.setZoom(16);
-            }
-            googleMarker.setPosition(place.geometry.location);
-            updateCoordsFromMap(place.geometry.location.lat(), place.geometry.location.lng(), place.formatted_address);
-        });
-    }
-}
-
-function updateCoordsFromMap(lat, lng, formattedAddress = null) {
-    document.getElementById('latitude').value = lat;
-    document.getElementById('longitude').value = lng;
-    
-    if (formattedAddress) {
-        document.getElementById('location-query').value = formattedAddress;
-        document.getElementById('current-location-display').textContent = `Current Location: [Manual] ${formattedAddress} (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`;
+function toggleAutoLocationInput(checkbox) {
+    const container = document.getElementById('manual-location-input-container');
+    if (checkbox.checked) {
+        container.classList.add('hidden');
     } else {
-        const geocoder = new google.maps.Geocoder();
-        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-            if (status === "OK" && results[0]) {
-                const addr = results[0].formatted_address;
-                document.getElementById('location-query').value = addr;
-                document.getElementById('current-location-display').textContent = `Current Location: [Manual] ${addr} (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`;
-            } else {
-                document.getElementById('current-location-display').textContent = `Current Location: Manual Point (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`;
-            }
-        });
+        container.classList.remove('hidden');
     }
 }
 
-function updateMapMarker(lat, lon) {
-    if (googleMap && googleMarker) {
-        const pos = { lat: parseFloat(lat), lng: parseFloat(lon) };
-        googleMap.setCenter(pos);
-        googleMarker.setPosition(pos);
-        updateCoordsFromMap(parseFloat(lat), parseFloat(lon));
+async function autoDetectLocationOnLoad() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = parseFloat(position.coords.latitude).toFixed(6);
+                const lon = parseFloat(position.coords.longitude).toFixed(6);
+                await saveCoordsToServer(lat, lon);
+            },
+            async (error) => {
+                console.log("On-load GPS location request failed, trying IP fallback...", error);
+                await autoDetectLocationViaIP();
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    } else {
+        await autoDetectLocationViaIP();
+    }
+}
+
+async function autoDetectLocationViaIP() {
+    try {
+        const response = await fetch('https://ipapi.co/json/');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.latitude && data.longitude) {
+                const lat = parseFloat(data.latitude).toFixed(6);
+                const lon = parseFloat(data.longitude).toFixed(6);
+                await saveCoordsToServer(lat, lon);
+                return;
+            }
+        }
+    } catch (e) {
+        console.log("On-load IP geolocator failed: ", e);
+    }
+    
+    try {
+        const response = await fetch('http://ip-api.com/json/');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.status === "success") {
+                const lat = parseFloat(data.lat).toFixed(6);
+                const lon = parseFloat(data.lon).toFixed(6);
+                await saveCoordsToServer(lat, lon);
+            }
+        }
+    } catch (e) {
+        console.log("On-load backup IP geolocator failed: ", e);
+    }
+}
+
+async function saveCoordsToServer(lat, lon) {
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                latitude: parseFloat(lat),
+                longitude: parseFloat(lon),
+                auto_location_enabled: true
+            })
+        });
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('location-query').value = data.settings.location_name ? data.settings.location_name.replace('[Manual] ', '').replace('[GPS] ', '').replace('[IP] ', '') : '';
+            document.getElementById('current-location-display').textContent = `Current Location: ${data.settings.location_name || 'Not set'} (${parseFloat(lat).toFixed(4)}°, ${parseFloat(lon).toFixed(4)}°)`;
+            console.log("Successfully auto-detected and updated coordinates:", lat, lon);
+        }
+    } catch (error) {
+        console.error("Failed to auto-save coordinates:", error);
     }
 }
 
@@ -307,14 +262,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('high-temp-threshold').value = data.high_temp_threshold;
             document.getElementById('latitude').value = data.latitude;
             document.getElementById('longitude').value = data.longitude;
-            document.getElementById('google-maps-key').value = data.google_maps_api_key || '';
+            
+            const autoLocToggle = document.getElementById('auto-location-toggle');
+            autoLocToggle.checked = data.auto_location_enabled;
+            toggleAutoLocationInput(autoLocToggle);
+            
             document.getElementById('location-query').value = data.location_name ? data.location_name.replace('[Manual] ', '').replace('[GPS] ', '').replace('[IP] ', '') : '';
             document.getElementById('current-location-display').textContent = `Current Location: ${data.location_name || 'Not set'} (${data.latitude.toFixed(4)}°, ${data.longitude.toFixed(4)}°)`;
             document.getElementById('pump-flow-rate').value = data.pump_flow_rate || 5.0;
             
-            // Initialize Map picker if Key is present
-            if (data.google_maps_api_key) {
-                initGoogleMaps(data.google_maps_api_key, data.latitude, data.longitude);
+            // Trigger auto-detect if enabled and no coordinates are saved yet, or on first load
+            if (data.auto_location_enabled) {
+                autoDetectLocationOnLoad();
             }
         }
     } catch (error) {
@@ -328,12 +287,11 @@ async function saveAllSettings() {
     const retraining_frequency = parseInt(document.getElementById('retraining-frequency').value);
     const dry_threshold = parseInt(document.getElementById('dry-threshold').value);
     const high_temp_threshold = parseInt(document.getElementById('high-temp-threshold').value);
-    const google_maps_api_key = document.getElementById('google-maps-key').value.trim();
+    const auto_location_enabled = document.getElementById('auto-location-toggle').checked;
     
     const latitude = document.getElementById('latitude').value ? parseFloat(document.getElementById('latitude').value) : null;
     const longitude = document.getElementById('longitude').value ? parseFloat(document.getElementById('longitude').value) : null;
     const location_query = document.getElementById('location-query').value;
-
     const pump_flow_rate = parseFloat(document.getElementById('pump-flow-rate').value);
 
     const statusDiv = document.getElementById('training-status');
@@ -348,9 +306,9 @@ async function saveAllSettings() {
             retraining_frequency,
             dry_threshold,
             high_temp_threshold,
+            auto_location_enabled,
             location_query,
-            pump_flow_rate,
-            google_maps_api_key
+            pump_flow_rate
         };
         
         if (latitude !== null && longitude !== null) {
@@ -370,18 +328,19 @@ async function saveAllSettings() {
             statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
             statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Settings saved successfully.`;
             
-            // Reload settings
+            // Reload settings to update UI values
             const reloadResponse = await fetch('/api/settings');
             const reloadData = await reloadResponse.json();
             if (reloadResponse.ok) {
                 document.getElementById('latitude').value = reloadData.latitude;
                 document.getElementById('longitude').value = reloadData.longitude;
-                document.getElementById('google-maps-key').value = reloadData.google_maps_api_key || '';
+                
+                const autoToggle = document.getElementById('auto-location-toggle');
+                autoToggle.checked = reloadData.auto_location_enabled;
+                toggleAutoLocationInput(autoToggle);
+                
                 document.getElementById('location-query').value = reloadData.location_name ? reloadData.location_name.replace('[Manual] ', '').replace('[GPS] ', '').replace('[IP] ', '') : '';
                 document.getElementById('current-location-display').textContent = `Current Location: ${reloadData.location_name || 'Not set'} (${reloadData.latitude.toFixed(4)}°, ${reloadData.longitude.toFixed(4)}°)`;
-                
-                // Initialize/reload map if key is set
-                initGoogleMaps(reloadData.google_maps_api_key, reloadData.latitude, reloadData.longitude);
             }
             
             setTimeout(() => statusDiv.classList.add('hidden'), 4000);
@@ -404,12 +363,17 @@ async function detectSettingsLocation() {
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-            (position) => {
+            async (position) => {
                 const lat = parseFloat(position.coords.latitude).toFixed(6);
                 const lon = parseFloat(position.coords.longitude).toFixed(6);
+                
+                // Set and save immediately
                 document.getElementById('latitude').value = lat;
                 document.getElementById('longitude').value = lon;
-                updateMapMarker(lat, lon);
+                
+                // Toggle switch off since they manually requested point setting
+                document.getElementById('auto-location-toggle').checked = false;
+                toggleAutoLocationInput(document.getElementById('auto-location-toggle'));
                 
                 statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
                 statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected precise device location (${lat}, ${lon}). Click "Save Settings" to save.`;
@@ -437,9 +401,11 @@ async function detectLocationViaIP() {
             if (data.latitude && data.longitude) {
                 const lat = parseFloat(data.latitude).toFixed(6);
                 const lon = parseFloat(data.longitude).toFixed(6);
+                
                 document.getElementById('latitude').value = lat;
                 document.getElementById('longitude').value = lon;
-                updateMapMarker(lat, lon);
+                document.getElementById('auto-location-toggle').checked = false;
+                toggleAutoLocationInput(document.getElementById('auto-location-toggle'));
                 
                 statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
                 statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected location: ${data.city || ''} (${lat}, ${lon}). Click "Save Settings" to save.`;
@@ -456,9 +422,11 @@ async function detectLocationViaIP() {
                 if (data.status === "success") {
                     const lat = parseFloat(data.lat).toFixed(6);
                     const lon = parseFloat(data.lon).toFixed(6);
+                    
                     document.getElementById('latitude').value = lat;
                     document.getElementById('longitude').value = lon;
-                    updateMapMarker(lat, lon);
+                    document.getElementById('auto-location-toggle').checked = false;
+                    toggleAutoLocationInput(document.getElementById('auto-location-toggle'));
                     
                     statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
                     statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected location: ${data.city || ''} (${lat}, ${lon}). Click "Save Settings" to save.`;
