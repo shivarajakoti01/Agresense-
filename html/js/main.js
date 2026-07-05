@@ -231,6 +231,12 @@ async function fetchLiveData() {
         const response = await fetch('/api/live_data');
         const data = await response.json();
         updateUI(data);
+        
+        // Auto-detect and align coordinates with browser location if enabled
+        if (data.auto_location_enabled && data.latitude && data.longitude) {
+            checkAndAutoGeolocate(data.latitude, data.longitude);
+        }
+        
         if (currentTab === 'pump') {
             fetchPumpHistory();
         }
@@ -1147,6 +1153,108 @@ function renderPumpHistory(logs) {
 // Bind to window scope so onclick calls can find them
 window.switchTab = switchTab;
 window.fetchPumpHistory = fetchPumpHistory;
+
+// Robust Keyless HTTPS Auto-Geolocation Flow
+async function runAutoGeolocation(onSuccess) {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = parseFloat(position.coords.latitude).toFixed(6);
+                const lon = parseFloat(position.coords.longitude).toFixed(6);
+                await onSuccess(lat, lon);
+            },
+            async (error) => {
+                console.log("GPS geolocation failed or denied, trying IP fallback...", error);
+                await runIPGeolocation(onSuccess);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    } else {
+        await runIPGeolocation(onSuccess);
+    }
+}
+
+async function runIPGeolocation(onSuccess) {
+    // Try FreeIPAPI (HTTPS, free, keyless, very reliable)
+    try {
+        const response = await fetch('https://freeipapi.com/api/json');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.latitude && data.longitude) {
+                await onSuccess(data.latitude, data.longitude);
+                return;
+            }
+        }
+    } catch (e) {
+        console.log("FreeIPAPI geolocator failed: ", e);
+    }
+    
+    // Try IPInfo.io (HTTPS, free, keyless)
+    try {
+        const response = await fetch('https://ipinfo.io/json');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.loc) {
+                const locParts = data.loc.split(',');
+                await onSuccess(parseFloat(locParts[0]), parseFloat(locParts[1]));
+                return;
+            }
+        }
+    } catch (e) {
+        console.log("IPInfo geolocator failed: ", e);
+    }
+    
+    // Try ipapi.co (HTTPS, free, keyless fallback)
+    try {
+        const response = await fetch('https://ipapi.co/json/');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.latitude && data.longitude) {
+                await onSuccess(data.latitude, data.longitude);
+                return;
+            }
+        }
+    } catch (e) {
+        console.log("ipapi.co geolocator failed: ", e);
+    }
+}
+
+let geolocationRun = false;
+async function checkAndAutoGeolocate(serverLat, serverLon) {
+    if (sessionStorage.getItem('geolocated') || geolocationRun) {
+        return;
+    }
+    geolocationRun = true;
+    
+    await runAutoGeolocation(async (lat, lon) => {
+        const latDiff = Math.abs(parseFloat(serverLat) - parseFloat(lat));
+        const lonDiff = Math.abs(parseFloat(serverLon) - parseFloat(lon));
+        
+        sessionStorage.setItem('geolocated', 'true');
+        
+        // If difference is more than 0.02 degrees (~2 km), update server!
+        if (latDiff > 0.02 || lonDiff > 0.02) {
+            console.log("Detected significant location shift. Updating server coordinates to:", lat, lon);
+            try {
+                await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: parseFloat(lat),
+                        longitude: parseFloat(lon),
+                        auto_location_enabled: true
+                    })
+                });
+                // Force weather refresh
+                if (typeof fetchWeatherData === 'function') {
+                    fetchWeatherData();
+                }
+            } catch (error) {
+                console.error("Failed to auto-save coordinates:", error);
+            }
+        }
+    });
+}
 
 
 

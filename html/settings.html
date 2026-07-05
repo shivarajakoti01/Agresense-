@@ -176,54 +176,77 @@ function toggleAutoLocationInput(checkbox) {
         container.classList.remove('hidden');
     }
 }
-
 async function autoDetectLocationOnLoad() {
+    await runAutoGeolocation(async (lat, lon) => {
+        await saveCoordsToServer(lat, lon);
+    });
+}
+
+async function runAutoGeolocation(onSuccess, onFailure = null) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 const lat = parseFloat(position.coords.latitude).toFixed(6);
                 const lon = parseFloat(position.coords.longitude).toFixed(6);
-                await saveCoordsToServer(lat, lon);
+                await onSuccess(lat, lon);
             },
             async (error) => {
-                console.log("On-load GPS location request failed, trying IP fallback...", error);
-                await autoDetectLocationViaIP();
+                console.log("GPS geolocation failed or denied, trying IP fallback...", error);
+                await runIPGeolocation(onSuccess, onFailure);
             },
             { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
         );
     } else {
-        await autoDetectLocationViaIP();
+        await runIPGeolocation(onSuccess, onFailure);
     }
 }
 
-async function autoDetectLocationViaIP() {
+async function runIPGeolocation(onSuccess, onFailure) {
+    // Try FreeIPAPI (HTTPS, free, keyless, very reliable)
+    try {
+        const response = await fetch('https://freeipapi.com/api/json');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.latitude && data.longitude) {
+                await onSuccess(data.latitude, data.longitude);
+                return;
+            }
+        }
+    } catch (e) {
+        console.log("FreeIPAPI geolocator failed: ", e);
+    }
+    
+    // Try IPInfo.io (HTTPS, free, keyless)
+    try {
+        const response = await fetch('https://ipinfo.io/json');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.loc) {
+                const locParts = data.loc.split(',');
+                await onSuccess(parseFloat(locParts[0]), parseFloat(locParts[1]));
+                return;
+            }
+        }
+    } catch (e) {
+        console.log("IPInfo geolocator failed: ", e);
+    }
+    
+    // Try ipapi.co (HTTPS, free, keyless fallback)
     try {
         const response = await fetch('https://ipapi.co/json/');
         if (response.ok) {
             const data = await response.json();
             if (data.latitude && data.longitude) {
-                const lat = parseFloat(data.latitude).toFixed(6);
-                const lon = parseFloat(data.longitude).toFixed(6);
-                await saveCoordsToServer(lat, lon);
+                await onSuccess(data.latitude, data.longitude);
                 return;
             }
         }
     } catch (e) {
-        console.log("On-load IP geolocator failed: ", e);
+        console.log("ipapi.co geolocator failed: ", e);
     }
-    
-    try {
-        const response = await fetch('http://ip-api.com/json/');
-        if (response.ok) {
-            const data = await response.json();
-            if (data.status === "success") {
-                const lat = parseFloat(data.lat).toFixed(6);
-                const lon = parseFloat(data.lon).toFixed(6);
-                await saveCoordsToServer(lat, lon);
-            }
-        }
-    } catch (e) {
-        console.log("On-load backup IP geolocator failed: ", e);
+
+    if (onFailure) {
+        onFailure();
     }
 }
 
@@ -270,7 +293,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('current-location-display').textContent = `Current Location: ${data.location_name || 'Not set'} (${data.latitude.toFixed(4)}°, ${data.longitude.toFixed(4)}°)`;
             document.getElementById('pump-flow-rate').value = data.pump_flow_rate || 5.0;
             
-            // Trigger auto-detect if enabled and no coordinates are saved yet, or on first load
+            // Trigger auto-detect if enabled
             if (data.auto_location_enabled) {
                 autoDetectLocationOnLoad();
             }
@@ -360,85 +383,23 @@ async function detectSettingsLocation() {
     statusDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Requesting browser GPS/Location...';
     statusDiv.classList.remove('hidden');
 
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                const lat = parseFloat(position.coords.latitude).toFixed(6);
-                const lon = parseFloat(position.coords.longitude).toFixed(6);
-                
-                // Set and save immediately
-                document.getElementById('latitude').value = lat;
-                document.getElementById('longitude').value = lon;
-                
-                // Toggle switch off since they manually requested point setting
-                document.getElementById('auto-location-toggle').checked = false;
-                toggleAutoLocationInput(document.getElementById('auto-location-toggle'));
-                
-                statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
-                statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected precise device location (${lat}, ${lon}). Click "Save Settings" to save.`;
-            },
-            async (error) => {
-                console.log("Precise browser geolocation failed or denied, trying IP fallback...", error);
-                await detectLocationViaIP();
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-    } else {
-        await detectLocationViaIP();
-    }
-}
-
-async function detectLocationViaIP() {
-    const statusDiv = document.getElementById('training-status');
-    statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-blue-900/30 text-blue-300 border-blue-500/50';
-    statusDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Detecting location via IP...';
-    
-    try {
-        const response = await fetch('https://ipapi.co/json/');
-        if (response.ok) {
-            const data = await response.json();
-            if (data.latitude && data.longitude) {
-                const lat = parseFloat(data.latitude).toFixed(6);
-                const lon = parseFloat(data.longitude).toFixed(6);
-                
-                document.getElementById('latitude').value = lat;
-                document.getElementById('longitude').value = lon;
-                document.getElementById('auto-location-toggle').checked = false;
-                toggleAutoLocationInput(document.getElementById('auto-location-toggle'));
-                
-                statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
-                statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected location: ${data.city || ''} (${lat}, ${lon}). Click "Save Settings" to save.`;
-                return;
-            }
+    await runAutoGeolocation(
+        async (lat, lon) => {
+            document.getElementById('latitude').value = lat;
+            document.getElementById('longitude').value = lon;
+            
+            // Toggle switch off since they manually requested point setting
+            document.getElementById('auto-location-toggle').checked = false;
+            toggleAutoLocationInput(document.getElementById('auto-location-toggle'));
+            
+            statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
+            statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected precise device location (${lat}, ${lon}). Click "Save Settings" to save.`;
+        },
+        () => {
+            statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-red-900/30 text-red-300 border-red-500/50';
+            statusDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2 text-red-500"></i> Could not detect location. Please enter location manually.`;
         }
-        throw new Error("Failed fetching from primary geolocation provider.");
-    } catch (error) {
-        console.log("Primary API failed, trying backup...", error);
-        try {
-            const backupResponse = await fetch('http://ip-api.com/json/');
-            if (backupResponse.ok) {
-                const data = await backupResponse.json();
-                if (data.status === "success") {
-                    const lat = parseFloat(data.lat).toFixed(6);
-                    const lon = parseFloat(data.lon).toFixed(6);
-                    
-                    document.getElementById('latitude').value = lat;
-                    document.getElementById('longitude').value = lon;
-                    document.getElementById('auto-location-toggle').checked = false;
-                    toggleAutoLocationInput(document.getElementById('auto-location-toggle'));
-                    
-                    statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
-                    statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected location: ${data.city || ''} (${lat}, ${lon}). Click "Save Settings" to save.`;
-                    return;
-                }
-            }
-        } catch (backupError) {
-            console.log("Backup API failed:", backupError);
-        }
-        
-        statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-red-900/30 text-red-300 border-red-500/50';
-        statusDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2 text-red-500"></i> Could not detect location. Please enter coordinates manually.`;
-    }
+    );
 }
 </script>
 {% endblock %}

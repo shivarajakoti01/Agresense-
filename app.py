@@ -859,6 +859,7 @@ def get_live_data():
         'latitude': _settings.get("latitude", 12.9172),
         'longitude': _settings.get("longitude", 74.856),
         'location_name': _settings.get("location_name", "Unknown Location"),
+        'auto_location_enabled': _settings.get("auto_location_enabled", True),
         'nodes': nodes_data
     }
     return jsonify(response)
