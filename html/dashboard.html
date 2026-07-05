@@ -49,7 +49,7 @@
         <div>
             <span class="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">System Status</span>
             <div class="flex items-center gap-2">
-                <span class="text-xl font-extrabold text-white" style="font-family: 'Outfit';">Active & Auto</span>
+                <span id="system-status-title" class="text-xl font-extrabold text-white" style="font-family: 'Outfit';">ESP32: ON</span>
                 <span class="w-2.5 h-2.5 rounded-full bg-[#00ff9d] heart-pulse ml-1"></span>
             </div>
             <div class="flex items-center gap-2 mt-1">
@@ -349,18 +349,28 @@
                 <div id="alerts-container"></div>
             </div>
             
-            <button onclick="triggerManualPump()" class="w-full bg-[#00ff9d] hover:bg-[#00d27f] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] hover:shadow-[0_0_30px_rgba(0,255,157,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                <i class="fa-solid fa-play text-[10px]"></i> Trigger Pump
+            <button onclick="triggerManualPump()" class="flex-1 bg-[#00ff9d] hover:bg-[#00d27f] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] hover:shadow-[0_0_30px_rgba(0,255,157,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play text-[10px]"></i> Turn ON
+            </button>
+            <button onclick="stopManualPump()" class="flex-1 bg-[#ff4d4d] hover:bg-[#e03d3d] text-white font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(255,77,77,0.2)] hover:shadow-[0_0_30px_rgba(255,77,77,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                <i class="fa-solid fa-stop text-[10px]"></i> Turn OFF
             </button>
         </div>
     </div>
 </div>
 
 <script>
-// Inline quick click handler delegated to main.js controller
+// Inline quick click handlers delegated to main.js controller
 async function triggerManualPump() {
     if (typeof window.triggerManualPumpController === 'function') {
         await window.triggerManualPumpController();
+    } else {
+        alert("Dashboard controller not loaded yet. Please wait.");
+    }
+}
+async function stopManualPump() {
+    if (typeof window.stopManualPumpController === 'function') {
+        await window.stopManualPumpController();
     } else {
         alert("Dashboard controller not loaded yet. Please wait.");
     }

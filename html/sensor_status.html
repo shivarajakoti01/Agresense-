@@ -15,11 +15,11 @@
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded bg-[#00d27f]/20 flex items-center justify-center text-[#00d27f]">
-                            <i class="fa-brands fa-usb"></i>
+                            <i class="fa-solid fa-microchip"></i>
                         </div>
                         <div>
-                            <p class="font-bold">ESP32 Main Node</p>
-                            <p class="text-xs text-gray-400">ID: AGR-Node-001</p>
+                            <p class="font-bold">Crops Node 1</p>
+                            <p class="text-xs text-gray-400">ID: AGR-Node-001 (Live)</p>
                         </div>
                     </div>
                     <span id="node-status" class="bg-[#00d27f]/20 text-[#00d27f] text-xs px-2 py-1 rounded border border-[#00d27f]/30">Online</span>
@@ -28,11 +28,11 @@
                 <div class="grid grid-cols-2 gap-4 text-sm border-t border-white/5 pt-4">
                     <div>
                         <p class="text-gray-500">Last Seen</p>
-                        <p class="font-medium">Just now</p>
+                        <p id="status-last-seen" class="font-medium">Just now</p>
                     </div>
                     <div>
-                        <p class="text-gray-500">Battery</p>
-                        <p class="font-medium text-green-400">85%</p>
+                        <p class="text-gray-500">Connection Mode</p>
+                        <p id="status-connection-mode" class="font-medium text-[#00d2ff]">Wi-Fi</p>
                     </div>
                     <div>
                         <p class="text-gray-500">Moisture Sensor</p>
@@ -41,6 +41,112 @@
                     <div>
                         <p class="text-gray-500">Temp Sensor</p>
                         <p class="font-medium" id="status-temp-val">Active</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">USB Serial Link</p>
+                        <p id="status-usb-link" class="font-medium text-gray-400">Checking...</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">GPS Signal</p>
+                        <p id="status-gps-signal" class="font-medium text-gray-400">Checking...</p>
+                    </div>
+                    <div class="col-span-2 border-t border-white/5 pt-2 mt-1">
+                        <p class="text-gray-500">Device Location</p>
+                        <p id="status-device-location" class="font-medium text-white text-xs truncate">Awaiting coordinates...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Node 2 -->
+            <div id="node-card-2" class="bg-black/30 p-4 rounded-xl border border-white/5 opacity-50 transition-opacity duration-300">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-gray-400" id="node-icon-container-2">
+                            <i class="fa-solid fa-tree"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold">Orchard Node 2</p>
+                            <p class="text-xs text-gray-400">ID: AGR-Node-002</p>
+                        </div>
+                    </div>
+                    <span id="node-status-2" class="bg-gray-800 text-gray-400 text-xs px-2 py-1 rounded border border-gray-700">Offline</span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 text-sm border-t border-white/5 pt-4">
+                    <div>
+                        <p class="text-gray-500">Last Seen</p>
+                        <p id="status-last-seen-2" class="font-medium text-gray-500">Never</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Connection Mode</p>
+                        <p id="status-connection-mode-2" class="font-medium text-gray-500">None</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Moisture Sensor</p>
+                        <p class="font-medium text-gray-500" id="status-moisture-val-2">Inactive</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Temp Sensor</p>
+                        <p class="font-medium text-gray-500" id="status-temp-val-2">Inactive</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">USB Serial Link</p>
+                        <p id="status-usb-link-2" class="font-medium text-gray-500">Disconnected</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">GPS Signal</p>
+                        <p id="status-gps-signal-2" class="font-medium text-gray-500">No Lock</p>
+                    </div>
+                    <div class="col-span-2 border-t border-white/5 pt-2 mt-1">
+                        <p class="text-gray-500">Device Location</p>
+                        <p id="status-device-location-2" class="font-medium text-gray-500 text-xs truncate">No Coordinates</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Node 3 -->
+            <div id="node-card-3" class="bg-black/30 p-4 rounded-xl border border-white/5 opacity-50 transition-opacity duration-300">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded bg-white/5 flex items-center justify-center text-gray-400" id="node-icon-container-3">
+                            <i class="fa-solid fa-seedling"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold">Garden Node 3</p>
+                            <p class="text-xs text-gray-400">ID: AGR-Node-003</p>
+                        </div>
+                    </div>
+                    <span id="node-status-3" class="bg-gray-800 text-gray-400 text-xs px-2 py-1 rounded border border-gray-700">Offline</span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 text-sm border-t border-white/5 pt-4">
+                    <div>
+                        <p class="text-gray-500">Last Seen</p>
+                        <p id="status-last-seen-3" class="font-medium text-gray-500">Never</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Connection Mode</p>
+                        <p id="status-connection-mode-3" class="font-medium text-gray-500">None</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Moisture Sensor</p>
+                        <p class="font-medium text-gray-500" id="status-moisture-val-3">Inactive</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">Temp Sensor</p>
+                        <p class="font-medium text-gray-500" id="status-temp-val-3">Inactive</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">USB Serial Link</p>
+                        <p id="status-usb-link-3" class="font-medium text-gray-500">Disconnected</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500">GPS Signal</p>
+                        <p id="status-gps-signal-3" class="font-medium text-gray-500">No Lock</p>
+                    </div>
+                    <div class="col-span-2 border-t border-white/5 pt-2 mt-1">
+                        <p class="text-gray-500">Device Location</p>
+                        <p id="status-device-location-3" class="font-medium text-gray-500 text-xs truncate">No Coordinates</p>
                     </div>
                 </div>
             </div>

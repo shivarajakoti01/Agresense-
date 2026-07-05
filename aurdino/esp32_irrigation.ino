@@ -1,11 +1,16 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <TinyGPS++.h>
 #include <HardwareSerial.h>
 
 // ---------------- WIFI DETAILS ----------------
 const char *ssid = "Shivaraja.ss";
 const char *password = "7411132938";
+
+// ---------------- NODE CONFIGURATION ----------------
+// Unique identifier for this ESP32 system. Change to "AGR-Node-002" or "AGR-Node-003" for additional devices.
+const char *nodeId = "AGR-Node-001";
 
 // ---------------- SERVER URL ----------------
 // Replace with your live Render server URL
@@ -44,6 +49,9 @@ void setup()
 
   // Heat sensor pin
   pinMode(heatSensorPin, INPUT_PULLUP);
+
+  // Configure ADC attenuation to 11dB (allows reading up to 3.3V)
+  analogSetAttenuation(ADC_11db);
 
   // Pump pin configuration
   pinMode(pumpPin, OUTPUT);
@@ -102,7 +110,8 @@ void loop()
   // Check WiFi
   if (WiFi.status() == WL_CONNECTED)
   {
-
+    WiFiClientSecure client;
+    client.setInsecure(); // Disable SSL certificate verification for HTTPS
     HTTPClient http;
 
     // ---------------- SOIL MOISTURE ----------------
@@ -132,7 +141,7 @@ void loop()
 
 
     // ---------------- HEAT SENSOR ----------------
-    bool heatDetected = !digitalRead(heatSensorPin); // Active-low: LOW (0) means fire/heat detected
+    bool heatDetected = false; // Disabled flame sensor check to prevent false alarms
 
     // ---------------- READ GPS LOCATION ----------------
     float latitude = 0.0;
@@ -200,7 +209,8 @@ void loop()
 
     // ---------------- CREATE JSON ----------------
     String jsonString = "{";
-    jsonString += "\"moisture\":" + String(moisturePercent, 2);
+    jsonString += "\"node_id\":\"" + String(nodeId) + "\"";
+    jsonString += ",\"moisture\":" + String(moisturePercent, 2);
     jsonString += ",\"heat_detected\":" + String(heatDetected ? "true" : "false");
     jsonString += ",\"gps_valid\":" + String(gpsValid ? "true" : "false");
     if (gpsValid)
@@ -213,8 +223,14 @@ void loop()
     jsonString += "}";
 
     // ---------------- SEND DATA ----------------
-    http.begin(serverUrl);
+    Serial.print("Connecting to URL: ");
+    Serial.println(serverUrl);
+
+    http.begin(client, serverUrl);
     http.setTimeout(60000); // 60 seconds timeout to allow Render service cold start
+
+    const char * headerKeys[] = {"Allow", "Location", "Content-Type"};
+    http.collectHeaders(headerKeys, 3);
 
     http.addHeader("Content-Type", "application/json");
 
@@ -257,6 +273,13 @@ void loop()
       Serial.print("HTTP Response Code: ");
       Serial.println(httpResponseCode);
 
+      if (httpResponseCode == 405) {
+        Serial.print("Allow Header: ");
+        Serial.println(http.header("Allow"));
+        Serial.print("Location Header: ");
+        Serial.println(http.header("Location"));
+      }
+
       String response = http.getString();
       Serial.print("Server Response: ");
       Serial.println(response);
@@ -298,9 +321,9 @@ void loop()
     }
   }
 
-  // Non-blocking wait: feed tasks and wait 10 seconds
+  // Non-blocking wait: feed tasks and wait 1 second
   unsigned long startWait = millis();
-  while (millis() - startWait < 10000)
+  while (millis() - startWait < 1000)
   {
     processBackgroundTasks();
     delay(5); // Prevent CPU hogging

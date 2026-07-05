@@ -71,6 +71,13 @@ last_pump_state = False
 active_log_id = None
 manual_trigger_flag = False
 manual_trigger_pending = False
+manual_stop_pending = False
+
+# ESP32 state variables
+_esp32_state = {
+    "gps_valid": False,
+    "location_source": "none"
+}
 
 def auto_detect_location():
     global _settings
@@ -217,6 +224,14 @@ with app.app_context():
         db.session.execute(db.text("ALTER TABLE sensor_reading ADD COLUMN pump_status BOOLEAN DEFAULT 0"))
         db.session.commit()
         print("Successfully ran database migration to add pump_status column.")
+    except Exception:
+        db.session.rollback()
+
+    # Migration to add node_id column to sensor_reading if it doesn't exist
+    try:
+        db.session.execute(db.text("ALTER TABLE sensor_reading ADD COLUMN node_id VARCHAR(50) DEFAULT 'AGR-Node-001'"))
+        db.session.commit()
+        print("Successfully ran database migration to add node_id column.")
     except Exception:
         db.session.rollback()
 
@@ -387,7 +402,7 @@ def get_current_weather_temp(lat, lon):
 
 @app.route('/api/sensor', methods=['POST'])
 def receive_sensor_data():
-    global last_valid_moisture, last_valid_temp, _settings, manual_trigger_pending, manual_trigger_flag
+    global last_valid_moisture, last_valid_temp, _settings, manual_trigger_pending, manual_trigger_flag, _esp32_state, manual_stop_pending
     data = request.json
     
     if not data or 'moisture' not in data:
@@ -397,10 +412,13 @@ def receive_sensor_data():
     temperature = data.get('temperature', 25.0)
     heat_detected = data.get('heat_detected', False)
     pump_status = data.get('pump_status', False)
+    node_id = data.get('node_id', 'AGR-Node-001')
     
     # Handle incoming GPS data from ESP32 module
     gps_valid = data.get('gps_valid', False)
     location_source = data.get('location_source', 'unknown')
+    _esp32_state["gps_valid"] = gps_valid
+    _esp32_state["location_source"] = location_source
     if gps_valid and 'latitude' in data and 'longitude' in data:
         try:
             lat = float(data['latitude'])
@@ -513,17 +531,19 @@ def receive_sensor_data():
             ai_result['recommendation'] = "Soil is critically dry (mainly needed). Irrigating immediately."
         
         # Weather API Integration
-        # Weather override only applies if there is NO fire/heat detected and soil is NOT critically dry.
-        if ai_result['water_needed'] and weather_enabled and not is_critically_dry and not is_heat_sensed:
+        # Weather override applies if there is NO fire/heat detected (even if soil is dry, to save water when rain is expected).
+        if ai_result['water_needed'] and weather_enabled and not is_heat_sensed:
             try:
                 weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=precipitation_probability&forecast_days=1"
                 resp = requests.get(weather_url, timeout=3)
                 if resp.status_code == 200:
                     weather_data = resp.json()
                     prob_array = weather_data.get('hourly', {}).get('precipitation_probability', [])
-                    if prob_array and max(prob_array) > 60:
+                    if prob_array and max(prob_array) > 0:
+                        max_prob = max(prob_array)
                         ai_result['water_needed'] = False
-                        ai_result['recommendation'] = "Rain expected today (Probability > 60%). Irrigation cancelled to save water."
+                        ai_result['recommendation'] = f"Rain expected today (Probability: {max_prob}%). Irrigation cancelled to save water."
+                        db.session.add(Alert(message=f"Rain expected today ({max_prob}%). Irrigation cancelled.", alert_type="Weather Override"))
             except Exception as e:
                 print(f"Weather API failed: {e}")
         
@@ -544,9 +564,13 @@ def receive_sensor_data():
         if pump_status:
             # Pump is already running, reset manual_trigger_flag to avoid mislabeling future auto starts
             manual_trigger_flag = False
+    elif manual_stop_pending:
+        ai_result['water_needed'] = False
+        ai_result['recommendation'] = "Irrigation pump manually stopped via web dashboard."
+        manual_stop_pending = False
             
     # Save Reading
-    new_reading = SensorReading(moisture=moisture, temperature=temperature, valid_reading=is_valid, pump_status=pump_status)
+    new_reading = SensorReading(node_id=node_id, moisture=moisture, temperature=temperature, valid_reading=is_valid, pump_status=pump_status)
     db.session.add(new_reading)
     
     # Track and log pump state transitions (irrigation cycles)
@@ -672,6 +696,34 @@ def trigger_pump():
         return jsonify({'status': 'success', 'message': msg})
 
 
+@app.route('/api/pump/stop', methods=['POST'])
+def stop_pump():
+    global manual_trigger_flag, manual_trigger_pending, manual_stop_pending
+    manual_trigger_flag = False
+    manual_trigger_pending = False
+    manual_stop_pending = True
+    
+    success, message = send_serial_command("PUMP_OFF")
+    
+    new_pred = PredictionHistory(
+        water_needed=False,
+        plant_health="Manual Override",
+        soil_condition="Manual Stop",
+        recommendation="Irrigation pump manually stopped via web dashboard.",
+        is_fallback_mode=False
+    )
+    db.session.add(new_pred)
+    db.session.commit()
+    
+    if success:
+        return jsonify({'status': 'success', 'message': message})
+    else:
+        # Fall back to wireless queueing if serial port fails (normal wireless operation)
+        msg = "Serial port unavailable. Pump stop queued wirelessly (will deactivate on next telemetry update)."
+        print(f"[INFO] {msg}")
+        return jsonify({'status': 'success', 'message': msg})
+
+
 @app.route('/api/irrigation/history', methods=['GET'])
 def get_irrigation_history():
     logs = IrrigationLog.query.order_by(IrrigationLog.start_time.desc()).limit(10).all()
@@ -687,23 +739,56 @@ def resolve_alerts():
 @app.route('/api/live_data', methods=['GET'])
 def get_live_data():
     """ Used by the frontend dashboard to poll for the latest state """
-    latest_reading = SensorReading.query.order_by(SensorReading.timestamp.desc()).first()
+    global _esp32_state
+    
+    # Backwards compatible: Main node is AGR-Node-001 (or absolute latest if node_id is missing/unassigned)
+    latest_reading = SensorReading.query.filter_by(node_id='AGR-Node-001').order_by(SensorReading.timestamp.desc()).first()
+    if not latest_reading:
+        latest_reading = SensorReading.query.order_by(SensorReading.timestamp.desc()).first()
+        
     latest_pred = PredictionHistory.query.order_by(PredictionHistory.timestamp.desc()).first()
     recent_alerts = Alert.query.filter_by(resolved=False).order_by(Alert.timestamp.desc()).limit(5).all()
     
-    # Check if sensor hasn't updated recently (simulate failure if > 60 seconds)
+    # Main node status check (3s threshold)
     sensor_offline = False
+    seconds_since_last_seen = None
     if latest_reading:
         time_diff = datetime.utcnow() - latest_reading.timestamp
-        if time_diff > timedelta(seconds=60):
+        seconds_since_last_seen = int(time_diff.total_seconds())
+        if time_diff > timedelta(seconds=3):
             sensor_offline = True
+
+    # Aggregate information for all 3 nodes
+    nodes_data = {}
+    for node in ['AGR-Node-001', 'AGR-Node-002', 'AGR-Node-003']:
+        r = SensorReading.query.filter_by(node_id=node).order_by(SensorReading.timestamp.desc()).first()
+        offline = True
+        node_seconds_since_last_seen = None
+        if r:
+            time_diff = datetime.utcnow() - r.timestamp
+            node_seconds_since_last_seen = int(time_diff.total_seconds())
+            if time_diff <= timedelta(seconds=3):
+                offline = False
+        nodes_data[node] = {
+            'sensor': r.to_dict() if r else None,
+            'sensor_status': 'Online' if (r and r.valid_reading and not offline) else 'Offline',
+            'seconds_since_last_seen': node_seconds_since_last_seen
+        }
 
     response = {
         'sensor': latest_reading.to_dict() if latest_reading else None,
         'prediction': latest_pred.to_dict() if latest_pred else None,
         'alerts': [a.to_dict() for a in recent_alerts],
         'sensor_status': 'Online' if (latest_reading and latest_reading.valid_reading and not sensor_offline) else 'Offline / Failing',
-        'fallback_active': latest_pred.is_fallback_mode if latest_pred else False
+        'fallback_active': latest_pred.is_fallback_mode if latest_pred else False,
+        'usb_connected': find_serial_port() is not None,
+        'seconds_since_last_seen': seconds_since_last_seen,
+        'gps_valid': _esp32_state.get("gps_valid", False),
+        'location_source': _esp32_state.get("location_source", "none"),
+        'latitude': _settings.get("latitude", 12.9172),
+        'longitude': _settings.get("longitude", 74.856),
+        'location_name': _settings.get("location_name", "Unknown Location"),
+        'nodes': nodes_data
     }
     return jsonify(response)
 
@@ -841,7 +926,7 @@ def get_weather_forecast():
                 'humidity': current_humidity,
                 'summary': summary,
                 'icon': icon,
-                'rain_override': bool(max_prob > 60 and weather_enabled),
+                'rain_override': bool(max_prob > 0 and weather_enabled),
                 'location_name': _settings.get("location_name", "auto-detected location")
             })
     except Exception as e:

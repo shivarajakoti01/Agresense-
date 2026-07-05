@@ -17,8 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (path === '/' || path === '/dashboard') {
         document.getElementById('nav-dashboard')?.classList.add('active');
         initDashboard();
-        // Poll every 3 seconds for dashboard
-        setInterval(fetchLiveData, 3000);
+        // Poll every 1 second for dashboard
+        setInterval(fetchLiveData, 1000);
         setInterval(fetchWaterStats, 10000);
         setInterval(fetchWeatherData, 15000);
     } else if (path === '/analytics') {
@@ -27,12 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (path === '/alerts') {
         document.getElementById('nav-schedule')?.classList.add('active');
         fetchLiveData(); // Initial fetch to populate UI
-        setInterval(fetchLiveData, 5000);
+        setInterval(fetchLiveData, 1000);
     } else if (path === '/sensor_status') {
         document.getElementById('nav-fields')?.classList.add('active');
         document.getElementById('nav-devices')?.classList.add('active');
         fetchLiveData();
-        setInterval(fetchLiveData, 5000);
+        setInterval(fetchLiveData, 1000);
     } else if (path === '/settings') {
         document.getElementById('nav-settings')?.classList.add('active');
         document.getElementById('nav-weather')?.classList.add('active');
@@ -70,11 +70,13 @@ async function fetchWeatherData() {
             const timelineLocationEl = document.getElementById('timeline-location');
             
             if (esp32OfflineState) {
-                // If ESP32 is offline, force weather cards to show dashed placeholders
+                // If ESP32 is offline, force weather cards to show dashed placeholders, but keep the location name
                 if (summaryEl) summaryEl.textContent = "---------";
                 if (rainProbEl) rainProbEl.textContent = "---------";
                 if (tempEl) tempEl.textContent = "---------";
-                if (locationNameEl) locationNameEl.textContent = "---------";
+                if (locationNameEl) {
+                    locationNameEl.textContent = (data.location_name || `${data.latitude.toFixed(4)}°, ${data.longitude.toFixed(4)}`) + " (Offline)";
+                }
                 if (iconEl) iconEl.className = "fa-solid fa-power-off text-red-500 animate-pulse";
                 if (overrideBadgeEl) overrideBadgeEl.classList.add('hidden');
                 return;
@@ -313,6 +315,98 @@ function updateUI(data) {
         statusTempVal.className = isOffline ? 'font-medium text-red-500' : 'font-medium text-[#00ff9d]';
     }
 
+    // Node Status Badge (Online vs Offline)
+    const nodeStatusEl = document.getElementById('node-status');
+    if (nodeStatusEl) {
+        if (isOffline) {
+            nodeStatusEl.textContent = 'OFF';
+            nodeStatusEl.className = 'bg-red-500/20 text-red-500 text-xs px-2 py-1 rounded border border-red-500/30';
+        } else {
+            nodeStatusEl.textContent = 'ON';
+            nodeStatusEl.className = 'bg-[#00d27f]/20 text-[#00d27f] text-xs px-2 py-1 rounded border border-[#00d27f]/30';
+        }
+    }
+
+    // Last Seen Timer
+    const lastSeenEl = document.getElementById('status-last-seen');
+    if (lastSeenEl) {
+        if (data.seconds_since_last_seen === null || data.seconds_since_last_seen === undefined) {
+            lastSeenEl.textContent = 'Never';
+            lastSeenEl.className = 'font-medium text-gray-500';
+        } else {
+            const secs = data.seconds_since_last_seen;
+            if (secs <= 2) {
+                lastSeenEl.textContent = 'Just now';
+                lastSeenEl.className = 'font-medium text-[#00ff9d]';
+            } else if (secs < 60) {
+                lastSeenEl.textContent = `${secs}s ago`;
+                lastSeenEl.className = 'font-medium text-white';
+            } else if (secs < 3600) {
+                const mins = Math.floor(secs / 60);
+                lastSeenEl.textContent = `${mins}m ago`;
+                lastSeenEl.className = 'font-medium text-gray-300';
+            } else {
+                const hrs = Math.floor(secs / 3600);
+                lastSeenEl.textContent = `${hrs}h ago`;
+                lastSeenEl.className = 'font-medium text-gray-400';
+            }
+        }
+    }
+
+    // Connection Mode
+    const connModeEl = document.getElementById('status-connection-mode');
+    if (connModeEl) {
+        if (isOffline) {
+            connModeEl.textContent = 'Disconnected';
+            connModeEl.className = 'font-medium text-red-500';
+        } else {
+            connModeEl.textContent = 'Wi-Fi (Wireless)';
+            connModeEl.className = 'font-medium text-[#00d2ff]';
+        }
+    }
+
+    // USB Serial Link
+    const usbLinkEl = document.getElementById('status-usb-link');
+    if (usbLinkEl) {
+        if (data.usb_connected) {
+            usbLinkEl.textContent = 'Connected (Active)';
+            usbLinkEl.className = 'font-medium text-[#00ff9d]';
+        } else {
+            usbLinkEl.textContent = 'Disconnected';
+            usbLinkEl.className = 'font-medium text-gray-500';
+        }
+    }
+
+    // GPS Signal
+    const gpsSignalEl = document.getElementById('status-gps-signal');
+    if (gpsSignalEl) {
+        if (isOffline) {
+            gpsSignalEl.textContent = 'No Signal';
+            gpsSignalEl.className = 'font-medium text-gray-500';
+        } else if (data.gps_valid) {
+            const src = data.location_source ? data.location_source.toUpperCase() : 'GPS';
+            gpsSignalEl.textContent = `Active (${src})`;
+            gpsSignalEl.className = 'font-medium text-[#00ff9d]';
+        } else {
+            gpsSignalEl.textContent = 'No Lock / Searching';
+            gpsSignalEl.className = 'font-medium text-yellow-500';
+        }
+    }
+
+    // Device Location Address
+    const devLocationEl = document.getElementById('status-device-location');
+    if (devLocationEl) {
+        if (data.location_name) {
+            const coordsStr = ` (${data.latitude.toFixed(4)}°, ${data.longitude.toFixed(4)}°)`;
+            devLocationEl.textContent = data.location_name + coordsStr;
+            devLocationEl.title = data.location_name + coordsStr;
+        } else if (data.latitude && data.longitude) {
+            devLocationEl.textContent = `${data.latitude.toFixed(6)}°, ${data.longitude.toFixed(6)}°`;
+        } else {
+            devLocationEl.textContent = 'Unknown / No Lock';
+        }
+    }
+
     // Live Pump Status Badge & Trigger Button Update
     const livePumpStatusBadge = document.getElementById('live-pump-status-badge');
     const pumpIsActive = data.sensor && data.sensor.pump_status;
@@ -331,19 +425,33 @@ function updateUI(data) {
     }
 
     const triggerBtn = document.querySelector('button[onclick="triggerManualPump()"]');
+    const stopBtn = document.querySelector('button[onclick="stopManualPump()"]');
+
     if (triggerBtn) {
         if (isOffline) {
             triggerBtn.disabled = true;
-            triggerBtn.innerHTML = `<i class="fa-solid fa-ban text-[10px]"></i> Trigger Pump`;
-            triggerBtn.className = 'w-full bg-gray-800 text-gray-500 font-extrabold py-3.5 px-4 rounded-xl cursor-not-allowed text-xs uppercase tracking-widest flex items-center justify-center gap-2';
+            triggerBtn.innerHTML = `<i class="fa-solid fa-ban text-[10px]"></i> Turn ON`;
+            triggerBtn.className = 'flex-1 bg-gray-800 text-gray-500 font-extrabold py-3.5 px-4 rounded-xl cursor-not-allowed text-xs uppercase tracking-widest flex items-center justify-center gap-2';
         } else if (pumpIsActive) {
             triggerBtn.disabled = false;
-            triggerBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin text-[10px]"></i> Pump Running...`;
-            triggerBtn.className = 'w-full bg-[#00d2ff] hover:bg-[#00b0d9] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,210,255,0.2)] transition-all duration-300 text-xs uppercase tracking-widest flex items-center justify-center gap-2';
+            triggerBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin text-[10px]"></i> Running...`;
+            triggerBtn.className = 'flex-1 bg-[#00d2ff] hover:bg-[#00b0d9] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,210,255,0.2)] transition-all duration-300 text-xs uppercase tracking-widest flex items-center justify-center gap-2';
         } else {
             triggerBtn.disabled = false;
-            triggerBtn.innerHTML = `<i class="fa-solid fa-play text-[10px]"></i> Trigger Pump`;
-            triggerBtn.className = 'w-full bg-[#00ff9d] hover:bg-[#00d27f] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] hover:shadow-[0_0_30px_rgba(0,255,157,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 text-xs uppercase tracking-widest flex items-center justify-center gap-2';
+            triggerBtn.innerHTML = `<i class="fa-solid fa-play text-[10px]"></i> Turn ON`;
+            triggerBtn.className = 'flex-1 bg-[#00ff9d] hover:bg-[#00d27f] text-[#080d16] font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] hover:shadow-[0_0_30px_rgba(0,255,157,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 text-xs uppercase tracking-widest flex items-center justify-center gap-2';
+        }
+    }
+
+    if (stopBtn) {
+        if (isOffline) {
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = `<i class="fa-solid fa-ban text-[10px]"></i> Turn OFF`;
+            stopBtn.className = 'flex-1 bg-gray-800 text-gray-500 font-extrabold py-3.5 px-4 rounded-xl cursor-not-allowed text-xs uppercase tracking-widest flex items-center justify-center gap-2';
+        } else {
+            stopBtn.disabled = false;
+            stopBtn.innerHTML = `<i class="fa-solid fa-stop text-[10px]"></i> Turn OFF`;
+            stopBtn.className = 'flex-1 bg-[#ff4d4d] hover:bg-[#e03d3d] text-white font-extrabold py-3.5 px-4 rounded-xl shadow-[0_0_20px_rgba(255,77,77,0.2)] hover:shadow-[0_0_30px_rgba(255,77,77,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 text-xs uppercase tracking-widest flex items-center justify-center gap-2';
         }
     }
 
@@ -365,12 +473,22 @@ function updateUI(data) {
         // If online: zone 1 shows active telemetries
         card1?.classList.remove('state-offline', 'state-unconfigured');
         
-        // Zone 2 and 3 show clean "Not Configured / Inactive" slot overlays (removing fake simulated calculations)
-        card2?.classList.add('state-unconfigured');
-        card2?.classList.remove('state-offline');
+        // Zone 2 and 3 show "Not Configured" only if no node data has been received yet
+        const hasN2 = data.nodes && data.nodes['AGR-Node-002'] && data.nodes['AGR-Node-002'].sensor;
+        if (!hasN2) {
+            card2?.classList.add('state-unconfigured');
+            card2?.classList.remove('state-offline');
+        } else {
+            card2?.classList.remove('state-unconfigured');
+        }
         
-        card3?.classList.add('state-unconfigured');
-        card3?.classList.remove('state-offline');
+        const hasN3 = data.nodes && data.nodes['AGR-Node-003'] && data.nodes['AGR-Node-003'].sensor;
+        if (!hasN3) {
+            card3?.classList.add('state-unconfigured');
+            card3?.classList.remove('state-offline');
+        } else {
+            card3?.classList.remove('state-unconfigured');
+        }
     }
     
     // 2. Update Crops 1 Gauge (Dynamic live values)
@@ -428,6 +546,10 @@ function updateUI(data) {
             systemHealthyText.textContent = '● Offline';
             systemHealthyText.className = 'text-xs font-bold text-red-500 uppercase tracking-wider';
         }
+        const systemStatusTitle = document.getElementById('system-status-title');
+        if (systemStatusTitle) {
+            systemStatusTitle.textContent = 'ESP32: OFF';
+        }
         
         // Trigger native Browser Desktop Notification
         if (!window.esp32WasOffline) {
@@ -446,6 +568,11 @@ function updateUI(data) {
         }
         window.esp32WasOffline = false;
         if (offlineBanner) offlineBanner.classList.add('hidden');
+        
+        const systemStatusTitle = document.getElementById('system-status-title');
+        if (systemStatusTitle) {
+            systemStatusTitle.textContent = 'ESP32: ON';
+        }
         
         if (fallbackBanner) {
             if (data.prediction && data.prediction.is_fallback_mode) {
@@ -610,6 +737,139 @@ function updateUI(data) {
             });
         }
     }
+
+    // Update multiple nodes dynamically (Node 2 & Node 3)
+    if (data.nodes) {
+        // --- NODE 2: Orchard Node (AGR-Node-002) ---
+        const n2 = data.nodes['AGR-Node-002'];
+        const card2 = document.getElementById('soil-card-2');
+        const nodeCard2 = document.getElementById('node-card-2');
+        
+        if (n2 && n2.sensor) {
+            // Remove unconfigured opacity
+            nodeCard2?.classList.remove('opacity-50');
+            nodeCard2?.classList.add('border-[#00d27f]/30');
+            nodeCard2?.classList.remove('border-white/5');
+            
+            const n2Offline = n2.sensor_status === 'Offline';
+            if (n2Offline) {
+                card2?.classList.add('state-offline');
+                
+                // Update Node 2 status card elements
+                const statusEl2 = document.getElementById('node-status-2');
+                if (statusEl2) {
+                    statusEl2.textContent = 'OFF';
+                    statusEl2.className = 'bg-red-500/20 text-red-500 text-xs px-2 py-1 rounded border border-red-500/30';
+                }
+                const iconContainer2 = document.getElementById('node-icon-container-2');
+                if (iconContainer2) {
+                    iconContainer2.className = 'w-10 h-10 rounded bg-red-500/20 flex items-center justify-center text-red-500';
+                }
+            } else {
+                card2?.classList.remove('state-offline');
+                
+                // Update Node 2 status card elements
+                const statusEl2 = document.getElementById('node-status-2');
+                if (statusEl2) {
+                    statusEl2.textContent = 'ON';
+                    statusEl2.className = 'bg-[#00d27f]/20 text-[#00d27f] text-xs px-2 py-1 rounded border border-[#00d27f]/30';
+                }
+                const iconContainer2 = document.getElementById('node-icon-container-2');
+                if (iconContainer2) {
+                    iconContainer2.className = 'w-10 h-10 rounded bg-[#00d27f]/20 flex items-center justify-center text-[#00d27f]';
+                }
+            }
+            
+            // Update gauges and values
+            const moisture2 = n2.sensor.moisture;
+            const temp2 = n2.sensor.temperature;
+            const mVal2 = document.getElementById('moisture-val-2');
+            if (mVal2) mVal2.textContent = n2Offline ? '--%' : `${moisture2.toFixed(0)}%`;
+            setCircularGauge('moisture-gauge-2', n2Offline ? 0 : moisture2);
+            
+            // Update node status card values
+            const lastSeen2 = document.getElementById('status-last-seen-2');
+            if (lastSeen2) lastSeen2.textContent = n2.seconds_since_last_seen === null ? 'Never' : `${n2.seconds_since_last_seen}s ago`;
+            const conn2 = document.getElementById('status-connection-mode-2');
+            if (conn2) conn2.textContent = n2Offline ? 'None' : 'Wi-Fi';
+            
+            const mState2 = document.getElementById('status-moisture-val-2');
+            if (mState2) {
+                mState2.textContent = n2Offline ? 'Inactive' : 'Active';
+                mState2.className = n2Offline ? 'font-medium text-gray-500' : 'font-medium text-[#00ff9d]';
+            }
+            const tState2 = document.getElementById('status-temp-val-2');
+            if (tState2) {
+                tState2.textContent = n2Offline ? 'Inactive' : `Active (${temp2.toFixed(1)}°C)`;
+                tState2.className = n2Offline ? 'font-medium text-gray-500' : 'font-medium text-[#00ff9d]';
+            }
+        }
+        
+        // --- NODE 3: Garden Node (AGR-Node-003) ---
+        const n3 = data.nodes['AGR-Node-003'];
+        const card3 = document.getElementById('soil-card-3');
+        const nodeCard3 = document.getElementById('node-card-3');
+        
+        if (n3 && n3.sensor) {
+            // Remove unconfigured opacity
+            nodeCard3?.classList.remove('opacity-50');
+            nodeCard3?.classList.add('border-[#00d27f]/30');
+            nodeCard3?.classList.remove('border-white/5');
+            
+            const n3Offline = n3.sensor_status === 'Offline';
+            if (n3Offline) {
+                card3?.classList.add('state-offline');
+                
+                // Update Node 3 status card elements
+                const statusEl3 = document.getElementById('node-status-3');
+                if (statusEl3) {
+                    statusEl3.textContent = 'OFF';
+                    statusEl3.className = 'bg-red-500/20 text-red-500 text-xs px-2 py-1 rounded border border-red-500/30';
+                }
+                const iconContainer3 = document.getElementById('node-icon-container-3');
+                if (iconContainer3) {
+                    iconContainer3.className = 'w-10 h-10 rounded bg-red-500/20 flex items-center justify-center text-red-500';
+                }
+            } else {
+                card3?.classList.remove('state-offline');
+                
+                // Update Node 3 status card elements
+                const statusEl3 = document.getElementById('node-status-3');
+                if (statusEl3) {
+                    statusEl3.textContent = 'ON';
+                    statusEl3.className = 'bg-[#00d27f]/20 text-[#00d27f] text-xs px-2 py-1 rounded border border-[#00d27f]/30';
+                }
+                const iconContainer3 = document.getElementById('node-icon-container-3');
+                if (iconContainer3) {
+                    iconContainer3.className = 'w-10 h-10 rounded bg-[#00d27f]/20 flex items-center justify-center text-[#00d27f]';
+                }
+            }
+            
+            // Update gauges and values
+            const moisture3 = n3.sensor.moisture;
+            const temp3 = n3.sensor.temperature;
+            const mVal3 = document.getElementById('moisture-val-3');
+            if (mVal3) mVal3.textContent = n3Offline ? '--%' : `${moisture3.toFixed(0)}%`;
+            setCircularGauge('moisture-gauge-3', n3Offline ? 0 : moisture3);
+            
+            // Update node status card values
+            const lastSeen3 = document.getElementById('status-last-seen-3');
+            if (lastSeen3) lastSeen3.textContent = n3.seconds_since_last_seen === null ? 'Never' : `${n3.seconds_since_last_seen}s ago`;
+            const conn3 = document.getElementById('status-connection-mode-3');
+            if (conn3) conn3.textContent = n3Offline ? 'None' : 'Wi-Fi';
+            
+            const mState3 = document.getElementById('status-moisture-val-3');
+            if (mState3) {
+                mState3.textContent = n3Offline ? 'Inactive' : 'Active';
+                mState3.className = n3Offline ? 'font-medium text-gray-500' : 'font-medium text-[#00ff9d]';
+            }
+            const tState3 = document.getElementById('status-temp-val-3');
+            if (tState3) {
+                tState3.textContent = n3Offline ? 'Inactive' : `Active (${temp3.toFixed(1)}°C)`;
+                tState3.className = n3Offline ? 'font-medium text-gray-500' : 'font-medium text-[#00ff9d]';
+            }
+        }
+    }
 }
 
 function updateChartData(chart, label, data) {
@@ -741,7 +1001,7 @@ function showToast(type, message) {
     }, 5000);
 }
 
-// Bind manual pump controller to window
+// Bind manual pump controllers to window
 window.triggerManualPumpController = async function() {
     try {
         const response = await fetch('/api/pump/trigger', { method: 'POST' });
@@ -749,13 +1009,29 @@ window.triggerManualPumpController = async function() {
         
         if (response.ok && data.status === 'success') {
             showToast('success', data.message);
-            // Instantly poll data to reflect the changes in prediction log
             setTimeout(fetchLiveData, 500);
         } else {
-            showToast('error', data.message || 'Error occurred while triggering pump.');
+            showToast('error', data.message || 'Error occurred while trying to trigger pump.');
         }
     } catch (error) {
-        console.error('Error triggering pump:', error);
+        console.error('Error trying to trigger pump:', error);
+        showToast('error', 'Connection to backend failed.');
+    }
+};
+
+window.stopManualPumpController = async function() {
+    try {
+        const response = await fetch('/api/pump/stop', { method: 'POST' });
+        const data = await response.json();
+        
+        if (response.ok && data.status === 'success') {
+            showToast('success', data.message);
+            setTimeout(fetchLiveData, 500);
+        } else {
+            showToast('error', data.message || 'Error occurred while trying to stop pump.');
+        }
+    } catch (error) {
+        console.error('Error trying to stop pump:', error);
         showToast('error', 'Connection to backend failed.');
     }
 };

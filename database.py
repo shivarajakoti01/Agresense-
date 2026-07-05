@@ -12,6 +12,7 @@ class User(db.Model):
 
 class SensorReading(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    node_id = db.Column(db.String(50), default='AGR-Node-001')
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     moisture = db.Column(db.Float, nullable=False)
     temperature = db.Column(db.Float, nullable=False)
@@ -21,6 +22,7 @@ class SensorReading(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'node_id': self.node_id if hasattr(self, 'node_id') else 'AGR-Node-001',
             'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             'moisture': self.moisture,
             'temperature': self.temperature,
