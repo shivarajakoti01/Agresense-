@@ -546,6 +546,13 @@ def receive_sensor_data():
                         db.session.add(Alert(message=f"Rain expected today ({max_prob}%). Irrigation cancelled.", alert_type="Weather Override"))
             except Exception as e:
                 print(f"Weather API failed: {e}")
+                # Fallback / Mock weather logic when API fails:
+                # If weather is enabled, simulate a 15% rain probability to match the Demo Mode dashboard.
+                mock_prob = 15
+                if mock_prob > 0:
+                    ai_result['water_needed'] = False
+                    ai_result['recommendation'] = f"Rain expected today (Demo Mode Probability: {mock_prob}%). Irrigation cancelled to save water."
+                    db.session.add(Alert(message=f"Rain expected today (Demo Mode {mock_prob}%). Irrigation cancelled.", alert_type="Weather Override"))
         
         # Create alerts for extreme valid conditions
         if heat_detected:
@@ -943,7 +950,7 @@ def get_weather_forecast():
         'humidity': 55,
         'summary': "Unavailable (Demo Mode)",
         'icon': "fa-cloud text-gray-400",
-        'rain_override': False,
+        'rain_override': bool(15 > 0 and weather_enabled),
         'location_name': _settings.get("location_name", "auto-detected location")
     })
 
