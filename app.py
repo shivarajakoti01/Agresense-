@@ -535,7 +535,10 @@ def receive_sensor_data():
         if ai_result['water_needed'] and weather_enabled and not is_heat_sensed:
             try:
                 weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=precipitation_probability&forecast_days=1"
-                resp = requests.get(weather_url, timeout=10)
+                headers = {'User-Agent': 'AgriSenseIrrigationSystem/1.0 (contact: shivarajakoti01@github.com)'}
+                resp = requests.get(weather_url, headers=headers, timeout=10)
+                if resp.status_code != 200:
+                    raise Exception(f"Open-Meteo API returned status code {resp.status_code}")
                 if resp.status_code == 200:
                     weather_data = resp.json()
                     prob_array = weather_data.get('hourly', {}).get('precipitation_probability', [])
@@ -899,7 +902,10 @@ def get_weather_forecast():
     
     try:
         weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=precipitation_probability,temperature_2m,relative_humidity_2m&forecast_days=1"
-        resp = requests.get(weather_url, timeout=10)
+        headers = {'User-Agent': 'AgriSenseIrrigationSystem/1.0 (contact: shivarajakoti01@github.com)'}
+        resp = requests.get(weather_url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            raise Exception(f"Open-Meteo API returned status code {resp.status_code}: {resp.text[:100]}")
         if resp.status_code == 200:
             wdata = resp.json()
             prob_array = wdata.get('hourly', {}).get('precipitation_probability', [])
