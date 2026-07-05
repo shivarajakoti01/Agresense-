@@ -9,5 +9,6 @@
     "auto_location_enabled": false,
     "location_name": "[Manual] Neeru Marga, Benjana Padavu, Karnataka",
     "pump_flow_rate": 8.8,
-    "dht_sensor_enabled": true
+    "dht_sensor_enabled": true,
+    "google_maps_api_key": ""
 }

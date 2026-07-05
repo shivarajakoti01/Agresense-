@@ -107,12 +107,27 @@
         
         <input type="hidden" id="latitude">
         <input type="hidden" id="longitude">
-        <div class="grid grid-cols-1 gap-6">
+        
+        <!-- Google Maps API Key Input -->
+        <div class="mb-6">
+            <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Google Maps API Key</label>
+            <input type="text" id="google-maps-key" placeholder="Enter Google Maps API Key to enable the Map Picker and Autocomplete" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors">
+            <p class="text-[10px] text-gray-500 mt-1">Requires an API key with Maps JavaScript, Places, and Geocoding APIs enabled.</p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 mb-6">
             <div>
                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Location / City Name</label>
                 <input type="text" id="location-query" placeholder="e.g. Mangalore, Bangalore, Mumbai" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors">
                 <p id="current-location-display" class="text-xs text-[#00ff9d] mt-2 font-medium"></p>
             </div>
+        </div>
+
+        <!-- Google Map Container -->
+        <div id="map-container" class="mb-6 hidden">
+            <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Interactive Map Picker</label>
+            <div id="map" class="w-full bg-black/20 border border-white/10 rounded-xl overflow-hidden shadow-inner" style="height: 320px;"></div>
+            <p class="text-[10px] text-gray-500 mt-1.5"><i class="fa-solid fa-circle-info mr-1"></i> Drag the marker or click on the map to choose coordinates.</p>
         </div>
     </div>
 
@@ -154,6 +169,132 @@ async function trainModel(type) {
     }
 }
 
+let googleMapsLoaded = false;
+let googleMap = null;
+let googleMarker = null;
+
+function initGoogleMaps(apiKey, lat, lon) {
+    if (!apiKey) {
+        document.getElementById('map-container').classList.add('hidden');
+        return;
+    }
+    document.getElementById('map-container').classList.remove('hidden');
+    
+    // Set hidden fields
+    if (lat) document.getElementById('latitude').value = lat;
+    if (lon) document.getElementById('longitude').value = lon;
+    
+    if (googleMapsLoaded) {
+        setupMapInstance(lat, lon);
+        return;
+    }
+    
+    window.initMap = function() {
+        googleMapsLoaded = true;
+        setupMapInstance(lat, lon);
+    };
+    
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+}
+
+function setupMapInstance(lat, lon) {
+    const defaultLat = parseFloat(lat) || 12.9172;
+    const defaultLng = parseFloat(lon) || 74.856;
+    const myLatLng = { lat: defaultLat, lng: defaultLng };
+    
+    const mapElement = document.getElementById("map");
+    if (!mapElement) return;
+    
+    googleMap = new google.maps.Map(mapElement, {
+        zoom: 13,
+        center: myLatLng,
+        mapTypeControl: false,
+        fullscreenControl: false,
+        styles: [
+            { elementType: "geometry", stylers: [{ color: "#1e293b" }] },
+            { elementType: "labels.text.stroke", stylers: [{ color: "#1e293b" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f172a" }] },
+            { featureType: "road", elementType: "geometry", stylers: [{ color: "#334155" }] }
+        ]
+    });
+    
+    googleMarker = new google.maps.Marker({
+        position: myLatLng,
+        map: googleMap,
+        draggable: true,
+        title: "Drag me to pick your farm location!"
+    });
+    
+    // Drag event
+    google.maps.event.addListener(googleMarker, 'dragend', function() {
+        const pos = googleMarker.getPosition();
+        updateCoordsFromMap(pos.lat(), pos.lng());
+    });
+    
+    // Click event
+    googleMap.addListener("click", (e) => {
+        const pos = e.latLng;
+        googleMarker.setPosition(pos);
+        updateCoordsFromMap(pos.lat(), pos.lng());
+    });
+    
+    // Autocomplete Search integration
+    const searchInput = document.getElementById("location-query");
+    if (searchInput) {
+        const autocomplete = new google.maps.places.Autocomplete(searchInput);
+        autocomplete.bindTo("bounds", googleMap);
+        
+        autocomplete.addListener("place_changed", () => {
+            const place = autocomplete.getPlace();
+            if (!place.geometry || !place.geometry.location) return;
+            
+            if (place.geometry.viewport) {
+                googleMap.fitBounds(place.geometry.viewport);
+            } else {
+                googleMap.setCenter(place.geometry.location);
+                googleMap.setZoom(16);
+            }
+            googleMarker.setPosition(place.geometry.location);
+            updateCoordsFromMap(place.geometry.location.lat(), place.geometry.location.lng(), place.formatted_address);
+        });
+    }
+}
+
+function updateCoordsFromMap(lat, lng, formattedAddress = null) {
+    document.getElementById('latitude').value = lat;
+    document.getElementById('longitude').value = lng;
+    
+    if (formattedAddress) {
+        document.getElementById('location-query').value = formattedAddress;
+        document.getElementById('current-location-display').textContent = `Current Location: [Manual] ${formattedAddress} (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`;
+    } else {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            if (status === "OK" && results[0]) {
+                const addr = results[0].formatted_address;
+                document.getElementById('location-query').value = addr;
+                document.getElementById('current-location-display').textContent = `Current Location: [Manual] ${addr} (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`;
+            } else {
+                document.getElementById('current-location-display').textContent = `Current Location: Manual Point (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`;
+            }
+        });
+    }
+}
+
+function updateMapMarker(lat, lon) {
+    if (googleMap && googleMarker) {
+        const pos = { lat: parseFloat(lat), lng: parseFloat(lon) };
+        googleMap.setCenter(pos);
+        googleMarker.setPosition(pos);
+        updateCoordsFromMap(parseFloat(lat), parseFloat(lon));
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         const response = await fetch('/api/settings');
@@ -166,9 +307,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('high-temp-threshold').value = data.high_temp_threshold;
             document.getElementById('latitude').value = data.latitude;
             document.getElementById('longitude').value = data.longitude;
+            document.getElementById('google-maps-key').value = data.google_maps_api_key || '';
             document.getElementById('location-query').value = data.location_name ? data.location_name.replace('[Manual] ', '').replace('[GPS] ', '').replace('[IP] ', '') : '';
             document.getElementById('current-location-display').textContent = `Current Location: ${data.location_name || 'Not set'} (${data.latitude.toFixed(4)}°, ${data.longitude.toFixed(4)}°)`;
             document.getElementById('pump-flow-rate').value = data.pump_flow_rate || 5.0;
+            
+            // Initialize Map picker if Key is present
+            if (data.google_maps_api_key) {
+                initGoogleMaps(data.google_maps_api_key, data.latitude, data.longitude);
+            }
         }
     } catch (error) {
         console.error("Failed to load settings:", error);
@@ -181,8 +328,8 @@ async function saveAllSettings() {
     const retraining_frequency = parseInt(document.getElementById('retraining-frequency').value);
     const dry_threshold = parseInt(document.getElementById('dry-threshold').value);
     const high_temp_threshold = parseInt(document.getElementById('high-temp-threshold').value);
+    const google_maps_api_key = document.getElementById('google-maps-key').value.trim();
     
-    // We send coordinates if detected via browser geolocator, otherwise let the backend geocode location_query
     const latitude = document.getElementById('latitude').value ? parseFloat(document.getElementById('latitude').value) : null;
     const longitude = document.getElementById('longitude').value ? parseFloat(document.getElementById('longitude').value) : null;
     const location_query = document.getElementById('location-query').value;
@@ -202,10 +349,10 @@ async function saveAllSettings() {
             dry_threshold,
             high_temp_threshold,
             location_query,
-            pump_flow_rate
+            pump_flow_rate,
+            google_maps_api_key
         };
         
-        // If coordinate bypass detection occurred, include it in payload
         if (latitude !== null && longitude !== null) {
             payload.latitude = latitude;
             payload.longitude = longitude;
@@ -223,14 +370,18 @@ async function saveAllSettings() {
             statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
             statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Settings saved successfully.`;
             
-            // Reload settings to update coordinates/clean label
+            // Reload settings
             const reloadResponse = await fetch('/api/settings');
             const reloadData = await reloadResponse.json();
             if (reloadResponse.ok) {
                 document.getElementById('latitude').value = reloadData.latitude;
                 document.getElementById('longitude').value = reloadData.longitude;
+                document.getElementById('google-maps-key').value = reloadData.google_maps_api_key || '';
                 document.getElementById('location-query').value = reloadData.location_name ? reloadData.location_name.replace('[Manual] ', '').replace('[GPS] ', '').replace('[IP] ', '') : '';
                 document.getElementById('current-location-display').textContent = `Current Location: ${reloadData.location_name || 'Not set'} (${reloadData.latitude.toFixed(4)}°, ${reloadData.longitude.toFixed(4)}°)`;
+                
+                // Initialize/reload map if key is set
+                initGoogleMaps(reloadData.google_maps_api_key, reloadData.latitude, reloadData.longitude);
             }
             
             setTimeout(() => statusDiv.classList.add('hidden'), 4000);
@@ -258,6 +409,7 @@ async function detectSettingsLocation() {
                 const lon = parseFloat(position.coords.longitude).toFixed(6);
                 document.getElementById('latitude').value = lat;
                 document.getElementById('longitude').value = lon;
+                updateMapMarker(lat, lon);
                 
                 statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
                 statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected precise device location (${lat}, ${lon}). Click "Save Settings" to save.`;
@@ -283,11 +435,14 @@ async function detectLocationViaIP() {
         if (response.ok) {
             const data = await response.json();
             if (data.latitude && data.longitude) {
-                document.getElementById('latitude').value = parseFloat(data.latitude).toFixed(6);
-                document.getElementById('longitude').value = parseFloat(data.longitude).toFixed(6);
+                const lat = parseFloat(data.latitude).toFixed(6);
+                const lon = parseFloat(data.longitude).toFixed(6);
+                document.getElementById('latitude').value = lat;
+                document.getElementById('longitude').value = lon;
+                updateMapMarker(lat, lon);
                 
                 statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
-                statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected location: ${data.city || ''} (${data.latitude}, ${data.longitude}). Click "Save Settings" to save.`;
+                statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected location: ${data.city || ''} (${lat}, ${lon}). Click "Save Settings" to save.`;
                 return;
             }
         }
@@ -299,11 +454,14 @@ async function detectLocationViaIP() {
             if (backupResponse.ok) {
                 const data = await backupResponse.json();
                 if (data.status === "success") {
-                    document.getElementById('latitude').value = parseFloat(data.lat).toFixed(6);
-                    document.getElementById('longitude').value = parseFloat(data.lon).toFixed(6);
+                    const lat = parseFloat(data.lat).toFixed(6);
+                    const lon = parseFloat(data.lon).toFixed(6);
+                    document.getElementById('latitude').value = lat;
+                    document.getElementById('longitude').value = lon;
+                    updateMapMarker(lat, lon);
                     
                     statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
-                    statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected location: ${data.city || ''} (${data.lat}, ${data.lon}). Click "Save Settings" to save.`;
+                    statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Detected location: ${data.city || ''} (${lat}, ${lon}). Click "Save Settings" to save.`;
                     return;
                 }
             }
