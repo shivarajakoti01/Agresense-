@@ -535,7 +535,7 @@ def receive_sensor_data():
         if ai_result['water_needed'] and weather_enabled and not is_heat_sensed:
             try:
                 weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=precipitation_probability&forecast_days=1"
-                resp = requests.get(weather_url, timeout=3)
+                resp = requests.get(weather_url, timeout=10)
                 if resp.status_code == 200:
                     weather_data = resp.json()
                     prob_array = weather_data.get('hourly', {}).get('precipitation_probability', [])
@@ -899,7 +899,7 @@ def get_weather_forecast():
     
     try:
         weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=precipitation_probability,temperature_2m,relative_humidity_2m&forecast_days=1"
-        resp = requests.get(weather_url, timeout=3)
+        resp = requests.get(weather_url, timeout=10)
         if resp.status_code == 200:
             wdata = resp.json()
             prob_array = wdata.get('hourly', {}).get('precipitation_probability', [])
@@ -937,7 +937,10 @@ def get_weather_forecast():
                 'location_name': _settings.get("location_name", "auto-detected location")
             })
     except Exception as e:
-        print(f"Weather route failed: {e}")
+        import traceback
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        tb = traceback.format_exc()
+        print(f"Weather route failed: {error_msg}\n{tb}")
         
     # Return mockup/fallback if offline or error
     return jsonify({
@@ -951,7 +954,8 @@ def get_weather_forecast():
         'summary': "Unavailable (Demo Mode)",
         'icon': "fa-cloud text-gray-400",
         'rain_override': bool(15 > 0 and weather_enabled),
-        'location_name': _settings.get("location_name", "auto-detected location")
+        'location_name': _settings.get("location_name", "auto-detected location"),
+        'error_details': error_msg if 'error_msg' in locals() else None
     })
 
 
