@@ -105,14 +105,13 @@
             </button>
         </div>
         
-        <div class="grid grid-cols-2 gap-6">
+        <input type="hidden" id="latitude">
+        <input type="hidden" id="longitude">
+        <div class="grid grid-cols-1 gap-6">
             <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Latitude</label>
-                <input type="number" step="any" id="latitude" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors">
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Longitude</label>
-                <input type="number" step="any" id="longitude" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors">
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Location / City Name</label>
+                <input type="text" id="location-query" placeholder="e.g. Mangalore, Bangalore, Mumbai" class="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-[#00ff9d] transition-colors">
+                <p id="current-location-display" class="text-xs text-[#00ff9d] mt-2 font-medium"></p>
             </div>
         </div>
     </div>
@@ -167,6 +166,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('high-temp-threshold').value = data.high_temp_threshold;
             document.getElementById('latitude').value = data.latitude;
             document.getElementById('longitude').value = data.longitude;
+            document.getElementById('location-query').value = data.location_name ? data.location_name.replace('[Manual] ', '').replace('[GPS] ', '').replace('[IP] ', '') : '';
+            document.getElementById('current-location-display').textContent = `Current Location: ${data.location_name || 'Not set'} (${data.latitude.toFixed(4)}°, ${data.longitude.toFixed(4)}°)`;
             document.getElementById('pump-flow-rate').value = data.pump_flow_rate || 5.0;
         }
     } catch (error) {
@@ -180,8 +181,11 @@ async function saveAllSettings() {
     const retraining_frequency = parseInt(document.getElementById('retraining-frequency').value);
     const dry_threshold = parseInt(document.getElementById('dry-threshold').value);
     const high_temp_threshold = parseInt(document.getElementById('high-temp-threshold').value);
-    const latitude = parseFloat(document.getElementById('latitude').value);
-    const longitude = parseFloat(document.getElementById('longitude').value);
+    
+    // We send coordinates if detected via browser geolocator, otherwise let the backend geocode location_query
+    const latitude = document.getElementById('latitude').value ? parseFloat(document.getElementById('latitude').value) : null;
+    const longitude = document.getElementById('longitude').value ? parseFloat(document.getElementById('longitude').value) : null;
+    const location_query = document.getElementById('location-query').value;
 
     const pump_flow_rate = parseFloat(document.getElementById('pump-flow-rate').value);
 
@@ -191,30 +195,49 @@ async function saveAllSettings() {
     statusDiv.classList.remove('hidden');
 
     try {
+        const payload = {
+            weather_prediction_enabled,
+            fallback_mode_enabled,
+            retraining_frequency,
+            dry_threshold,
+            high_temp_threshold,
+            location_query,
+            pump_flow_rate
+        };
+        
+        // If coordinate bypass detection occurred, include it in payload
+        if (latitude !== null && longitude !== null) {
+            payload.latitude = latitude;
+            payload.longitude = longitude;
+        }
+
         const response = await fetch('/api/settings', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                weather_prediction_enabled,
-                fallback_mode_enabled,
-                retraining_frequency,
-                dry_threshold,
-                high_temp_threshold,
-                latitude,
-                longitude,
-                pump_flow_rate
-            })
+            body: JSON.stringify(payload)
         });
 
         if (response.ok) {
             statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-green-900/30 text-green-300 border-[#00ff9d]/50';
             statusDiv.innerHTML = `<i class="fa-solid fa-check-circle mr-2 text-[#00ff9d]"></i> Settings saved successfully.`;
-            setTimeout(() => statusDiv.classList.add('hidden'), 3000);
+            
+            // Reload settings to update coordinates/clean label
+            const reloadResponse = await fetch('/api/settings');
+            const reloadData = await reloadResponse.json();
+            if (reloadResponse.ok) {
+                document.getElementById('latitude').value = reloadData.latitude;
+                document.getElementById('longitude').value = reloadData.longitude;
+                document.getElementById('location-query').value = reloadData.location_name ? reloadData.location_name.replace('[Manual] ', '').replace('[GPS] ', '').replace('[IP] ', '') : '';
+                document.getElementById('current-location-display').textContent = `Current Location: ${reloadData.location_name || 'Not set'} (${reloadData.latitude.toFixed(4)}°, ${reloadData.longitude.toFixed(4)}°)`;
+            }
+            
+            setTimeout(() => statusDiv.classList.add('hidden'), 4000);
         } else {
+            const errorData = await response.json();
             statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-red-900/30 text-red-300 border-red-500/50';
-            statusDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2 text-red-500"></i> Failed to save settings.`;
+            statusDiv.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2 text-red-500"></i> ${errorData.error || 'Failed to save settings.'}`;
         }
     } catch (error) {
         statusDiv.className = 'mt-4 p-4 rounded-xl text-sm font-medium border bg-red-900/30 text-red-300 border-red-500/50';

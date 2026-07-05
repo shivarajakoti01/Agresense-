@@ -927,9 +927,79 @@ def handle_settings():
             return jsonify({'error': 'Invalid request'}), 400
             
         should_geocode = False
-        # Update settings keys
+        
+        # 1. Handle city/place name geocoding if query is supplied and differs from current setting
+        location_query = data.get('location_query')
+        if location_query:
+            clean_query = location_query.strip()
+            # If the user typed a new location query, let's geocode it using Nominatim
+            current_clean = _settings.get('location_name', '').replace('[Manual] ', '').replace('[GPS] ', '').replace('[IP] ', '')
+            if clean_query and clean_query != current_clean:
+                try:
+                    headers = {'User-Agent': 'AgriSenseIrrigationSystem/1.0 (contact: shivarajakoti01@github.com)'}
+                    geocode_url = f"https://nominatim.openstreetmap.org/search?q={requests.utils.quote(clean_query)}&format=json&limit=1"
+                    resp = requests.get(geocode_url, headers=headers, timeout=5)
+                    if resp.status_code == 200:
+                        results = resp.json()
+                        if results:
+                            res = results[0]
+                            _settings["latitude"] = float(res["lat"])
+                            _settings["longitude"] = float(res["lon"])
+                            
+                            display_name = res.get("display_name", "")
+                            parts = [p.strip() for p in display_name.split(",")]
+                            clean_name = ", ".join(parts[:3]) if len(parts) >= 3 else display_name
+                            
+                            _settings["location_name"] = f"[Manual] {clean_name}"
+                            _settings["auto_location_enabled"] = False
+                            print(f"Successfully geocoded '{clean_query}' to: {_settings['latitude']}, {_settings['longitude']} ({_settings['location_name']})")
+                        else:
+                            # Fallback: Try geocoding via wttr.in nearest_area if Nominatim fails to return anything
+                            try:
+                                wttr_url = f"https://wttr.in/{requests.utils.quote(clean_query)}?format=j1"
+                                resp_wttr = requests.get(wttr_url, headers=headers, timeout=5)
+                                if resp_wttr.status_code == 200:
+                                    res_wttr = resp_wttr.json()
+                                    area = res_wttr.get('nearest_area', [{}])[0]
+                                    if area:
+                                        _settings["latitude"] = float(area["latitude"])
+                                        _settings["longitude"] = float(area["longitude"])
+                                        _settings["location_name"] = f"[Manual] {clean_query.title()}"
+                                        _settings["auto_location_enabled"] = False
+                                        print(f"Successfully geocoded '{clean_query}' via wttr.in to: {_settings['latitude']}, {_settings['longitude']}")
+                                    else:
+                                        return jsonify({'error': f"Location '{clean_query}' not found. Please try another place name."}), 400
+                                else:
+                                    return jsonify({'error': f"Geocoding service returned error {resp_wttr.status_code}"}), 503
+                            except Exception:
+                                return jsonify({'error': f"Location '{clean_query}' not found. Please check spelling."}), 400
+                    else:
+                        # Fallback: Try geocoding via wttr.in nearest_area if Nominatim service is blocked/failing
+                        try:
+                            wttr_url = f"https://wttr.in/{requests.utils.quote(clean_query)}?format=j1"
+                            resp_wttr = requests.get(wttr_url, headers=headers, timeout=5)
+                            if resp_wttr.status_code == 200:
+                                res_wttr = resp_wttr.json()
+                                area = res_wttr.get('nearest_area', [{}])[0]
+                                if area:
+                                    _settings["latitude"] = float(area["latitude"])
+                                    _settings["longitude"] = float(area["longitude"])
+                                    _settings["location_name"] = f"[Manual] {clean_query.title()}"
+                                    _settings["auto_location_enabled"] = False
+                                    print(f"Successfully geocoded '{clean_query}' via wttr.in to: {_settings['latitude']}, {_settings['longitude']}")
+                                else:
+                                    return jsonify({'error': f"Location '{clean_query}' not found. Please try another place name."}), 400
+                            else:
+                                return jsonify({'error': f"Geocoding service returned error {resp_wttr.status_code}"}), 503
+                        except Exception:
+                            return jsonify({'error': f"Location '{clean_query}' not found. Please check spelling."}), 400
+                except Exception as e:
+                    print(f"Geocoding error: {e}")
+                    return jsonify({'error': f"Geocoding failed: {str(e)}"}), 500
+
+        # Update other settings keys
         for key in ['weather_prediction_enabled', 'fallback_mode_enabled', 'retraining_frequency', 
-                    'dry_threshold', 'high_temp_threshold', 'latitude', 'longitude', 'auto_location_enabled', 'pump_flow_rate']:
+                    'dry_threshold', 'high_temp_threshold', 'auto_location_enabled', 'pump_flow_rate']:
             if key in data:
                 if key in ['weather_prediction_enabled', 'fallback_mode_enabled', 'auto_location_enabled']:
                     _settings[key] = bool(data[key])
@@ -937,12 +1007,13 @@ def handle_settings():
                     _settings[key] = int(data[key])
                 elif key == 'pump_flow_rate':
                     _settings[key] = float(data[key])
-                elif key in ['latitude', 'longitude']:
-                    val = float(data[key])
-                    if _settings.get(key) != val:
-                        _settings[key] = val
-                        _settings["auto_location_enabled"] = False  # Turn off auto-overwrite when user enters coordinates manually
-                        should_geocode = True
+                    
+        # Update coordinates directly only if explicitly sent (e.g. from browser geolocator bypass)
+        if 'latitude' in data and 'longitude' in data:
+            _settings["latitude"] = float(data["latitude"])
+            _settings["longitude"] = float(data["longitude"])
+            _settings["auto_location_enabled"] = False
+            should_geocode = True
                         
         if should_geocode:
             # Perform reverse geocoding in background
