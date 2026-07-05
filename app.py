@@ -826,7 +826,7 @@ def get_live_data():
     if latest_reading:
         time_diff = datetime.utcnow() - latest_reading.timestamp
         seconds_since_last_seen = int(time_diff.total_seconds())
-        if time_diff > timedelta(seconds=3):
+        if time_diff > timedelta(seconds=30):
             sensor_offline = True
 
     # Aggregate information for all 3 nodes
@@ -838,7 +838,7 @@ def get_live_data():
         if r:
             time_diff = datetime.utcnow() - r.timestamp
             node_seconds_since_last_seen = int(time_diff.total_seconds())
-            if time_diff <= timedelta(seconds=3):
+            if time_diff <= timedelta(seconds=30):
                 offline = False
         nodes_data[node] = {
             'sensor': r.to_dict() if r else None,
