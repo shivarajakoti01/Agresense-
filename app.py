@@ -381,14 +381,57 @@ def settings():
 last_weather_temp = 25.0
 last_weather_fetch_time = None
 
+def fetch_backup_weather(lat, lon):
+    try:
+        url = f"https://wttr.in/{lat},{lon}?format=j1"
+        headers = {'User-Agent': 'AgriSenseIrrigationSystem/1.0 (contact: shivarajakoti01@github.com)'}
+        resp = requests.get(url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            curr = data['current_condition'][0]
+            temp = float(curr['temp_C'])
+            humidity = float(curr['humidity'])
+            summary = curr['weatherDesc'][0]['value']
+            
+            hourly = data['weather'][0]['hourly']
+            max_prob = max([int(h['chanceofrain']) for h in hourly])
+            
+            # Map weather description to appropriate icons
+            desc_lower = summary.lower()
+            icon = "fa-cloud text-gray-400"
+            if "rain" in desc_lower or "shower" in desc_lower or "drizzle" in desc_lower:
+                icon = "fa-cloud-showers-heavy text-blue-400"
+            elif "thunder" in desc_lower:
+                icon = "fa-cloud-bolt text-yellow-500"
+            elif "sunny" in desc_lower or "clear" in desc_lower:
+                icon = "fa-sun text-yellow-400"
+            elif "cloud" in desc_lower or "overcast" in desc_lower:
+                icon = "fa-cloud-sun text-gray-300"
+            elif "fog" in desc_lower or "mist" in desc_lower or "haze" in desc_lower:
+                icon = "fa-smog text-gray-400"
+                
+            return {
+                'success': True,
+                'temperature': temp,
+                'humidity': humidity,
+                'precipitation_probability': max_prob,
+                'summary': summary,
+                'icon': icon
+            }
+    except Exception as e:
+        print(f"wttr.in backup weather failed: {e}")
+    return {'success': False}
+
 def get_current_weather_temp(lat, lon):
     global last_weather_temp, last_weather_fetch_time
     now = datetime.utcnow()
     # Cache for 15 minutes (900 seconds)
     if last_weather_fetch_time is None or (now - last_weather_fetch_time).total_seconds() > 900:
+        # Try Open-Meteo first
         try:
             weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m&forecast_days=1"
-            resp = requests.get(weather_url, timeout=2)
+            headers = {'User-Agent': 'AgriSenseIrrigationSystem/1.0 (contact: shivarajakoti01@github.com)'}
+            resp = requests.get(weather_url, headers=headers, timeout=5)
             if resp.status_code == 200:
                 wdata = resp.json()
                 temp_array = wdata.get('hourly', {}).get('temperature_2m', [])
@@ -396,8 +439,17 @@ def get_current_weather_temp(lat, lon):
                     last_weather_temp = temp_array[0]
                     last_weather_fetch_time = now
                     print(f"Updated cached weather temperature: {last_weather_temp}C")
+                    return last_weather_temp
         except Exception as e:
-            print(f"Failed to fetch weather temp: {e}")
+            print(f"Failed to fetch weather temp from Open-Meteo: {e}")
+            
+        # Try wttr.in backup
+        backup = fetch_backup_weather(lat, lon)
+        if backup['success']:
+            last_weather_temp = backup['temperature']
+            last_weather_fetch_time = now
+            print(f"Updated cached weather temperature using backup wttr.in: {last_weather_temp}C")
+            
     return last_weather_temp
 
 @app.route('/api/sensor', methods=['POST'])
@@ -549,12 +601,22 @@ def receive_sensor_data():
                         db.session.add(Alert(message=f"Rain expected today ({max_prob}%). Irrigation cancelled.", alert_type="Weather Override"))
             except Exception as e:
                 print(f"Weather API failed: {e}")
-                # If weather is enabled, simulate a 85% rain probability to match the Demo Mode dashboard for Mangaluru.
-                mock_prob = 85
-                if mock_prob > 0:
-                    ai_result['water_needed'] = False
-                    ai_result['recommendation'] = f"Rain expected today (Demo Mode Probability: {mock_prob}%). Irrigation cancelled to save water."
-                    db.session.add(Alert(message=f"Rain expected today (Demo Mode {mock_prob}%). Irrigation cancelled.", alert_type="Weather Override"))
+                # Try wttr.in backup weather API
+                backup = fetch_backup_weather(lat, lon)
+                if backup['success']:
+                    max_prob = backup['precipitation_probability']
+                    if max_prob > 0:
+                        ai_result['water_needed'] = False
+                        ai_result['recommendation'] = f"Rain expected today (Backup Probability: {max_prob}%). Irrigation cancelled to save water."
+                        db.session.add(Alert(message=f"Rain expected today (Backup {max_prob}%). Irrigation cancelled.", alert_type="Weather Override"))
+                else:
+                    # Fallback / Mock weather logic when BOTH APIs fail:
+                    # Default mock probability is 85% to trigger override for Mangaluru/standard fallback.
+                    mock_prob = 85
+                    if mock_prob > 0:
+                        ai_result['water_needed'] = False
+                        ai_result['recommendation'] = f"Rain expected today (Demo Mode Probability: {mock_prob}%). Irrigation cancelled to save water."
+                        db.session.add(Alert(message=f"Rain expected today (Demo Mode {mock_prob}%). Irrigation cancelled.", alert_type="Weather Override"))
         
         # Create alerts for extreme valid conditions
         if heat_detected:
@@ -947,7 +1009,25 @@ def get_weather_forecast():
         tb = traceback.format_exc()
         print(f"Weather route failed: {error_msg}\n{tb}")
         
-    # Return mockup/fallback if offline or error
+        # Try wttr.in backup weather API
+        backup = fetch_backup_weather(lat, lon)
+        if backup['success']:
+            return jsonify({
+                'status': 'success',
+                'latitude': lat,
+                'longitude': lon,
+                'weather_prediction_enabled': weather_enabled,
+                'precipitation_probability': backup['precipitation_probability'],
+                'temperature': backup['temperature'],
+                'humidity': backup['humidity'],
+                'summary': backup['summary'],
+                'icon': backup['icon'],
+                'rain_override': bool(backup['precipitation_probability'] > 0 and weather_enabled),
+                'location_name': _settings.get("location_name", "auto-detected location"),
+                'backup_active': True
+            })
+        
+    # Return mockup/fallback if BOTH APIs fail
     return jsonify({
         'status': 'fallback',
         'latitude': lat,
